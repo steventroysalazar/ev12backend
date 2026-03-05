@@ -73,6 +73,13 @@ public class UserDeviceService {
     }
 
     @Transactional(readOnly = true)
+    public List<DeviceResponse> listAllDevices() {
+        return deviceRepository.findAll().stream()
+            .map(this::toDeviceResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Device getDevice(Long deviceId) {
         return deviceRepository.findById(deviceId)
             .orElseThrow(() -> new IllegalArgumentException("Device not found."));

@@ -1,0 +1,27 @@
+server:
+  port: 8090
+
+spring:
+ datasource:
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-fancy-pond-a17fqnwa-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+        driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+        username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+        password: ${SPRING_DATASOURCE_PASSWORD:npg_kdvM23qafLQn}
+
+ jpa:
+        hibernate:
+            ddl-auto: update
+        open-in-view: false
+
+ h2:
+    console:
+      enabled: ${SPRING_H2_CONSOLE_ENABLED:true}
+      path: /h2-console
+
+gateway:
+  base-url: http://192.168.1.37:8082
+  token: "00f30633-4029-4cb7-b088-1f84e7251a53"
+  default-limit: 100
+
+webhook:
+  ev12-token: ${WEBHOOK_EV12_TOKEN:}

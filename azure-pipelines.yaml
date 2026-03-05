@@ -1,0 +1,78 @@
+trigger:
+- develop
+- uat
+
+resources:
+- repo: self
+
+parameters:
+  - name: buildAndDeploy
+    displayName: 'Build and Deploy'
+    type: string
+    default: buildAndDeploy
+    values:
+      - buildAndDeploy
+      - build
+
+variables:
+  project: ev12
+  region: australiaeast
+  app_name: 'ev12-backend'
+  # ... Environment conditional logic remains perfectly intact ...
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    environment: prod
+  ${{ if eq(variables['Build.SourceBranchName'], 'uat') }}:
+    environment: uat
+  ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
+    environment: dev
+    
+  dockerRegistryServiceConnection: 'scacr-$(project)-$(environment)'
+  imageRepository: '$(app_name)'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  azureSubscription: "scarm-${{ variables.project }}-${{ variables.environment }}"
+  imageTag: '$(Build.BuildNumber)'
+  vmImageName: 'ubuntu-latest'
+  resourceGroup: 'rg-ca-$(project)-$(environment)-$(region)'
+  containerAppName: '$(app_name)-$(environment)'
+  containerRegistry: "acr$(project)$(environment).azurecr.io"
+  envFile: $(System.DefaultWorkingDirectory)/.env
+
+stages:
+- stage: Build
+  condition: or( ${{ eq(parameters.buildAndDeploy, 'build') }} ,${{ eq(parameters.buildAndDeploy, 'buildAndDeploy') }} )
+  displayName: Build and push docker images
+  jobs:
+    - job: DockerBuildImage
+      displayName: Build and push docker images
+      pool:
+        vmImage: $(vmImageName)
+      steps:
+      - task: Docker@2
+        inputs:
+          command: buildAndPush
+          repository: $(imageRepository)
+          containerRegistry: $(dockerRegistryServiceConnection)
+          Dockerfile: $(dockerfilePath)
+          tags: '$(imageTag)'
+
+- ${{ if ne(variables['Build.SourceBranchName'],'main') }}:
+  - stage: Deploy
+    condition: and(${{ eq(parameters.buildAndDeploy, 'buildAndDeploy') }} , succeeded())
+    displayName: Deploy Container App
+    jobs:
+    - deployment: DeployContainerApp
+      displayName: Deploy Container App
+      # SIMPLIFIED: Just use the variable you evaluated at the top of the file!
+      environment: $(environment)
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - task: AzureContainerApps@1
+              inputs:
+                azureSubscription: $(azureSubscription)
+                imageToDeploy : $(containerRegistry)/$(imageRepository):$(imageTag)
+                containerAppName: '$(containerAppName)'
+                resourceGroup: $(resourceGroup)
+                # ADDED: Assuming you want to inject environment variables from the envFile
+                # yamlConfigPath: ... (or inject secrets directly here depending on your infra setup)

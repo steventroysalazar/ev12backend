@@ -10,6 +10,7 @@ import java.util.Base64;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -38,6 +39,7 @@ public class Ev12WebhookService {
         return toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<Ev12WebhookEventResponse> recentEvents(int limit, String providedToken) {
         validateToken(providedToken);
         int normalizedLimit = Math.max(1, Math.min(limit, 100));

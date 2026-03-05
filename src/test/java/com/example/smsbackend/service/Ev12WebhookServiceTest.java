@@ -28,7 +28,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void ingestShouldStoreRawPayload() {
-        String rawPayload = "{\"Configuration Command\":{\"IMEI\":\"862667084205114\"}}";
+        byte[] rawPayload = "{\"Configuration Command\":{\"IMEI\":\"862667084205114\"}}".getBytes();
         when(repository.save(any(Ev12WebhookEvent.class))).thenAnswer(invocation -> {
             Ev12WebhookEvent event = invocation.getArgument(0);
             event.setReceivedAt(Instant.now());
@@ -36,22 +36,36 @@ class Ev12WebhookServiceTest {
         });
 
         Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties(null));
-        Ev12WebhookEventResponse response = service.ingest(rawPayload, null);
+        Ev12WebhookEventResponse response = service.ingest(rawPayload, "application/json", null);
 
-        assertEquals(rawPayload, response.payloadJson());
+        assertEquals(new String(rawPayload), response.payloadJson());
+    }
+
+
+    @Test
+    void ingestShouldBase64EncodeBinaryPayload() {
+        byte[] rawPayload = new byte[]{0x01, 0x02, 0x03};
+        when(repository.save(any(Ev12WebhookEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties(null));
+        Ev12WebhookEventResponse response = service.ingest(rawPayload, "application/octet-stream", null);
+
+        assertEquals("base64:AQID", response.payloadJson());
     }
 
     @Test
     void ingestShouldRequireValidTokenWhenConfigured() {
         Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties("secret"));
 
-        assertThrows(ResponseStatusException.class, () -> service.ingest("{}", "wrong"));
+        assertThrows(ResponseStatusException.class, () -> service.ingest("{}".getBytes(), "application/json", "wrong"));
     }
 
     @Test
-    void ingestShouldRejectEmptyPayload() {
+    void ingestShouldAcceptEmptyPayload() {
         Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties(null));
 
-        assertThrows(IllegalArgumentException.class, () -> service.ingest("   ", null));
+        Ev12WebhookEventResponse response = service.ingest(new byte[0], "application/octet-stream", null);
+
+        assertEquals("", response.payloadJson());
     }
 }

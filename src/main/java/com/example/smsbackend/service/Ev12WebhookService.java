@@ -4,7 +4,9 @@ import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
 import com.example.smsbackend.entity.Ev12WebhookEvent;
 import com.example.smsbackend.repository.Ev12WebhookEventRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,15 +27,12 @@ public class Ev12WebhookService {
         this.webhookProperties = webhookProperties;
     }
 
-    public Ev12WebhookEventResponse ingest(String rawPayload, String providedToken) {
+    public Ev12WebhookEventResponse ingest(byte[] rawPayload, String contentType, String providedToken) {
         validateToken(providedToken);
-        if (!StringUtils.hasText(rawPayload)) {
-            throw new IllegalArgumentException("Webhook payload cannot be empty");
-        }
 
         Ev12WebhookEvent event = new Ev12WebhookEvent();
         event.setReceivedAt(Instant.now());
-        event.setPayloadJson(rawPayload.trim());
+        event.setPayloadJson(serializePayload(rawPayload, contentType));
 
         Ev12WebhookEvent saved = repository.save(event);
         return toResponse(saved);
@@ -46,6 +45,31 @@ public class Ev12WebhookService {
             .limit(normalizedLimit)
             .map(this::toResponse)
             .toList();
+    }
+
+
+    private String serializePayload(byte[] rawPayload, String contentType) {
+        if (rawPayload == null || rawPayload.length == 0) {
+            return "";
+        }
+
+        if (isTextPayload(contentType)) {
+            return new String(rawPayload, StandardCharsets.UTF_8);
+        }
+
+        return "base64:" + Base64.getEncoder().encodeToString(rawPayload);
+    }
+
+    private boolean isTextPayload(String contentType) {
+        if (!StringUtils.hasText(contentType)) {
+            return true;
+        }
+
+        String normalized = contentType.toLowerCase();
+        return normalized.contains("json")
+            || normalized.contains("text")
+            || normalized.contains("xml")
+            || normalized.contains("x-www-form-urlencoded");
     }
 
     private void validateToken(String providedToken) {

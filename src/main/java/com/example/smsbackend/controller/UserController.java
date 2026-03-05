@@ -1,6 +1,8 @@
 package com.example.smsbackend.controller;
 
+import com.example.smsbackend.dto.CreateDeviceForUserRequest;
 import com.example.smsbackend.dto.CreateDeviceRequest;
+import com.example.smsbackend.dto.DeviceDetailsResponse;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.service.UserDeviceService;
@@ -41,6 +43,24 @@ public class UserController {
         @Valid @RequestBody CreateDeviceRequest request
     ) {
         return ResponseEntity.ok(userDeviceService.createDevice(userId, request));
+    }
+
+
+    @PostMapping("/devices")
+    public ResponseEntity<DeviceResponse> createDeviceForUser(@Valid @RequestBody CreateDeviceForUserRequest request) {
+        CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber());
+        return ResponseEntity.ok(userDeviceService.createDevice(request.userId(), createDeviceRequest));
+    }
+
+    @GetMapping("/devices")
+    public ResponseEntity<List<DeviceResponse>> listDevices() {
+        return ResponseEntity.ok(userDeviceService.listAllDevices());
+    }
+
+
+    @GetMapping("/devices/{deviceId}")
+    public ResponseEntity<DeviceDetailsResponse> getDeviceDetails(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.getDeviceDetails(deviceId));
     }
 
     @GetMapping("/users/{userId}/devices")

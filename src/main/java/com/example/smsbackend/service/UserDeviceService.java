@@ -1,6 +1,7 @@
 package com.example.smsbackend.service;
 
 import com.example.smsbackend.dto.CreateDeviceRequest;
+import com.example.smsbackend.dto.DeviceDetailsResponse;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
@@ -70,6 +71,31 @@ public class UserDeviceService {
         return deviceRepository.findByUserLocationId(locationId).stream()
             .map(this::toDeviceResponse)
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeviceResponse> listAllDevices() {
+        return deviceRepository.findAll().stream()
+            .map(this::toDeviceResponse)
+            .toList();
+    }
+
+
+    @Transactional(readOnly = true)
+    public DeviceDetailsResponse getDeviceDetails(Long deviceId) {
+        Device device = getDevice(deviceId);
+        AppUser owner = device.getUser();
+        String ownerName = owner.getFirstName() + " " + owner.getLastName();
+
+        return new DeviceDetailsResponse(
+            device.getId(),
+            device.getName(),
+            device.getPhoneNumber(),
+            owner.getId(),
+            ownerName.trim(),
+            owner.getLocation() != null ? owner.getLocation().getId() : null,
+            owner.getLocation() != null ? owner.getLocation().getName() : null
+        );
     }
 
     @Transactional(readOnly = true)

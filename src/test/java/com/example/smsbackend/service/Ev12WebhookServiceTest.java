@@ -88,9 +88,9 @@ class Ev12WebhookServiceTest {
     @Test
     void recentEventsShouldOnlyReturnLatestThreeEvents() {
         when(repository.findTop3ByOrderByReceivedAtDesc()).thenReturn(List.of(
-            createEvent(1L),
-            createEvent(2L),
-            createEvent(3L)
+            createEvent(),
+            createEvent(),
+            createEvent()
         ));
 
         Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties(null), objectMapper);
@@ -100,9 +100,8 @@ class Ev12WebhookServiceTest {
         assertEquals(3, events.size());
     }
 
-    private Ev12WebhookEvent createEvent(Long id) {
+    private Ev12WebhookEvent createEvent() {
         Ev12WebhookEvent event = new Ev12WebhookEvent();
-        event.setId(id);
         event.setReceivedAt(Instant.now());
         event.setPayloadJson("{}");
         return event;

@@ -28,9 +28,10 @@ public class Ev12WebhookController {
     public ResponseEntity<Map<String, Object>> ingest(
         @RequestBody(required = false) byte[] rawPayload,
         @RequestHeader(value = "Content-Type", required = false) String contentType,
-        @RequestHeader(value = "X-Webhook-Token", required = false) String webhookToken
+        @RequestHeader(value = "X-Webhook-Token", required = false) String webhookToken,
+        @RequestHeader Map<String, String> rawHeaders
     ) {
-        Ev12WebhookEventResponse saved = ev12WebhookService.ingest(rawPayload, contentType, webhookToken);
+        Ev12WebhookEventResponse saved = ev12WebhookService.ingest(rawPayload, contentType, webhookToken, rawHeaders);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
             "success", true,
             "event", saved

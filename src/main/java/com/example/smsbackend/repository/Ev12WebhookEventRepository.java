@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface Ev12WebhookEventRepository extends JpaRepository<Ev12WebhookEvent, Long> {
 
-    List<Ev12WebhookEvent> findTop100ByOrderByReceivedAtDesc();
+    List<Ev12WebhookEvent> findTop3ByOrderByReceivedAtDesc();
 }

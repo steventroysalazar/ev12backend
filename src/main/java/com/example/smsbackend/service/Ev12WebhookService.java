@@ -54,8 +54,8 @@ public class Ev12WebhookService {
     @Transactional(readOnly = true)
     public List<Ev12WebhookEventResponse> recentEvents(int limit, String providedToken) {
         validateToken(providedToken);
-        int normalizedLimit = Math.max(1, Math.min(limit, 100));
-        return repository.findTop100ByOrderByReceivedAtDesc().stream()
+        int normalizedLimit = Math.max(1, Math.min(limit, 3));
+        return repository.findTop3ByOrderByReceivedAtDesc().stream()
             .limit(normalizedLimit)
             .map(this::toResponse)
             .toList();

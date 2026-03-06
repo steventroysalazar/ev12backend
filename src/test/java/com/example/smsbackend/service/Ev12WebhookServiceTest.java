@@ -12,6 +12,7 @@ import com.example.smsbackend.repository.Ev12WebhookEventRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,5 +83,27 @@ class Ev12WebhookServiceTest {
 
         JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
         assertEquals("", payloadJson.get("rawBody").asText());
+    }
+
+    @Test
+    void recentEventsShouldOnlyReturnLatestThreeEvents() {
+        when(repository.findTop3ByOrderByReceivedAtDesc()).thenReturn(List.of(
+            createEvent(),
+            createEvent(),
+            createEvent()
+        ));
+
+        Ev12WebhookService service = new Ev12WebhookService(repository, new WebhookProperties(null), objectMapper);
+
+        List<Ev12WebhookEventResponse> events = service.recentEvents(20, null);
+
+        assertEquals(3, events.size());
+    }
+
+    private Ev12WebhookEvent createEvent() {
+        Ev12WebhookEvent event = new Ev12WebhookEvent();
+        event.setReceivedAt(Instant.now());
+        event.setPayloadJson("{}");
+        return event;
     }
 }

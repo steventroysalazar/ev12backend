@@ -40,7 +40,7 @@ public class Ev12WebhookController {
 
     @GetMapping("/ev12/events")
     public ResponseEntity<List<Ev12WebhookEventResponse>> recent(
-        @RequestParam(defaultValue = "20") Integer limit,
+        @RequestParam(defaultValue = "3") Integer limit,
         @RequestHeader(value = "X-Webhook-Token", required = false) String webhookToken
     ) {
         return ResponseEntity.ok(ev12WebhookService.recentEvents(limit, webhookToken));

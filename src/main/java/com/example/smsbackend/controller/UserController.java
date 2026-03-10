@@ -3,6 +3,8 @@ package com.example.smsbackend.controller;
 import com.example.smsbackend.dto.CreateDeviceForUserRequest;
 import com.example.smsbackend.dto.CreateDeviceRequest;
 import com.example.smsbackend.dto.DeviceResponse;
+import com.example.smsbackend.dto.UpdateDeviceRequest;
+import com.example.smsbackend.dto.UpdateUserRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.service.UserDeviceService;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,6 +39,15 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+
+    @PutMapping("/users/{userId}")
+    public ResponseEntity<UserResponse> updateUser(
+        @PathVariable Long userId,
+        @Valid @RequestBody UpdateUserRequest request
+    ) {
+        return ResponseEntity.ok(userDeviceService.updateUser(userId, request));
+    }
+
     @PostMapping("/users/{userId}/devices")
     public ResponseEntity<DeviceResponse> createDevice(
         @PathVariable Long userId,
@@ -49,6 +61,15 @@ public class UserController {
     public ResponseEntity<DeviceResponse> createDeviceForUser(@Valid @RequestBody CreateDeviceForUserRequest request) {
         CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber());
         return ResponseEntity.ok(userDeviceService.createDevice(request.userId(), createDeviceRequest));
+    }
+
+
+    @PutMapping("/devices/{deviceId}")
+    public ResponseEntity<DeviceResponse> updateDevice(
+        @PathVariable Long deviceId,
+        @Valid @RequestBody UpdateDeviceRequest request
+    ) {
+        return ResponseEntity.ok(userDeviceService.updateDevice(deviceId, request));
     }
 
     @GetMapping("/devices")

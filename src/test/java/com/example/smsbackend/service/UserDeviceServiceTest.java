@@ -1,0 +1,127 @@
+package com.example.smsbackend.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+import com.example.smsbackend.dto.UpdateDeviceRequest;
+import com.example.smsbackend.dto.UpdateUserRequest;
+import com.example.smsbackend.entity.AppUser;
+import com.example.smsbackend.entity.Device;
+import com.example.smsbackend.entity.Location;
+import com.example.smsbackend.entity.UserRole;
+import com.example.smsbackend.repository.AppUserRepository;
+import com.example.smsbackend.repository.DeviceRepository;
+import com.example.smsbackend.repository.LocationRepository;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class UserDeviceServiceTest {
+
+    @Mock
+    private AppUserRepository appUserRepository;
+
+    @Mock
+    private DeviceRepository deviceRepository;
+
+    @Mock
+    private LocationRepository locationRepository;
+
+    private UserDeviceService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository);
+    }
+
+    @Test
+    void updateUser_updatesManagerAndLocation() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 1L);
+        user.setRole(UserRole.MANAGER);
+
+        AppUser manager = new AppUser();
+        ReflectionTestUtils.setField(manager, "id", 2L);
+        manager.setRole(UserRole.MANAGER);
+
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 3L);
+
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(appUserRepository.findById(2L)).thenReturn(Optional.of(manager));
+        when(locationRepository.findById(3L)).thenReturn(Optional.of(location));
+        when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.updateUser(1L, new UpdateUserRequest(
+            "New",
+            "Name",
+            null,
+            null,
+            null,
+            null,
+            3L,
+            false,
+            2L,
+            false
+        ));
+
+        assertEquals(1L, response.id());
+        assertEquals(3L, response.locationId());
+        assertEquals(2L, response.managerId());
+    }
+
+    @Test
+    void updateDevice_reassignsUser() {
+        AppUser oldUser = new AppUser();
+        ReflectionTestUtils.setField(oldUser, "id", 7L);
+
+        AppUser newUser = new AppUser();
+        ReflectionTestUtils.setField(newUser, "id", 8L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 9L);
+        device.setUser(oldUser);
+        device.setName("Original");
+        device.setPhoneNumber("111");
+
+        when(deviceRepository.findById(9L)).thenReturn(Optional.of(device));
+        when(appUserRepository.findById(8L)).thenReturn(Optional.of(newUser));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", 8L));
+
+        assertEquals(9L, response.id());
+        assertEquals(8L, response.userId());
+        assertEquals("Renamed", response.name());
+        assertEquals("222", response.phoneNumber());
+    }
+
+    @Test
+    void updateUser_rejectsRole3WithoutManager() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 1L);
+        user.setRole(UserRole.USER);
+
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertThrows(IllegalArgumentException.class, () -> service.updateUser(1L, new UpdateUserRequest(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true
+        )));
+    }
+}

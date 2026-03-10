@@ -2,6 +2,7 @@ package com.example.smsbackend.service;
 
 import com.example.smsbackend.dto.CreateLocationRequest;
 import com.example.smsbackend.dto.LocationResponse;
+import com.example.smsbackend.dto.UpdateLocationRequest;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.DeviceRepository;
@@ -9,6 +10,7 @@ import com.example.smsbackend.repository.LocationRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class LocationService {
@@ -39,6 +41,35 @@ public class LocationService {
 
         Location saved = locationRepository.save(location);
         return new LocationResponse(saved.getId(), saved.getName(), saved.getDetails(), 0, 0);
+    }
+
+    @Transactional
+    public LocationResponse updateLocation(Long locationId, UpdateLocationRequest request) {
+        Location location = locationRepository.findById(locationId)
+            .orElseThrow(() -> new IllegalArgumentException("Location not found."));
+
+        if (StringUtils.hasText(request.name())) {
+            String normalizedName = request.name().trim();
+            locationRepository.findByNameIgnoreCase(normalizedName).ifPresent(existing -> {
+                if (!existing.getId().equals(location.getId())) {
+                    throw new IllegalArgumentException("Location already exists.");
+                }
+            });
+            location.setName(normalizedName);
+        }
+
+        if (request.details() != null) {
+            location.setDetails(StringUtils.hasText(request.details()) ? request.details().trim() : null);
+        }
+
+        Location saved = locationRepository.save(location);
+        return new LocationResponse(
+            saved.getId(),
+            saved.getName(),
+            saved.getDetails(),
+            appUserRepository.findByLocationId(saved.getId()).size(),
+            deviceRepository.countByUserLocationId(saved.getId())
+        );
     }
 
     @Transactional(readOnly = true)

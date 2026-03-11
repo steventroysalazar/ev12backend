@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.example.smsbackend.dto.DeviceContactSettings;
 import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
 import com.example.smsbackend.dto.UpdateUserRequest;
@@ -98,6 +99,7 @@ class UserDeviceServiceTest {
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", 8L, new DeviceProtocolSettings(
+            java.util.List.of(new DeviceContactSettings(1, true, true, "123456789", "Emma")),
             "123456789", 1, true, true, "Emma", "123456", true, true, false, false, true, false,
             10, 90, true, true, true, "Emma", true, 1, 20, "35S", "20M", true, 5, true, true,
             "80M", true, false, null, null, null, true, "100km/h", true, 0, "100m", true,
@@ -110,6 +112,7 @@ class UserDeviceServiceTest {
         assertEquals("Renamed", response.name());
         assertEquals("222", response.phoneNumber());
         assertEquals("123456789", response.protocolSettings().contactNumber());
+        assertEquals(1, response.protocolSettings().contacts().size());
     }
 
     @Test

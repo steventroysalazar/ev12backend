@@ -1,6 +1,9 @@
 package com.example.smsbackend.dto;
 
+import java.util.List;
+
 public record DeviceProtocolSettings(
+    List<DeviceContactSettings> contacts,
     String contactNumber,
     Integer contactSlot,
     Boolean contactSmsEnabled,

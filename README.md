@@ -46,6 +46,22 @@ Notes:
   "phoneNumber": "+1555999000",
   "userId": 10,
   "protocolSettings": {
+    "contacts": [
+      {
+        "slot": 1,
+        "smsEnabled": true,
+        "callEnabled": true,
+        "phone": "123456789",
+        "name": "Emma"
+      },
+      {
+        "slot": 2,
+        "smsEnabled": true,
+        "callEnabled": false,
+        "phone": "123456780",
+        "name": "Dad"
+      }
+    ],
     "contactNumber": "123456789",
     "contactSlot": 1,
     "contactSmsEnabled": true,
@@ -111,6 +127,8 @@ Notes:
 - Any provided field is updated.
 - `userId` can reassign the device to another user.
 - `protocolSettings` lets frontend persist EV-07B / EV-04 / EV-05 SMS configuration profile per device.
+- Use `protocolSettings.contacts` to manage up to 10 contact slots (`A1`..`A10`) in one payload.
+- Legacy single-contact fields (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`) are still accepted for backward compatibility.
 - Device list/read APIs now include `protocolSettings` in each `DeviceResponse`.
 
 ### 3) Update location
@@ -160,6 +178,10 @@ That means UI can:
   "deviceId": 123
 }
 ```
+
+Contact behavior for `/api/send-config`:
+- If `contacts` is provided, backend sends contact commands for each entry (up to 10).
+- If `contacts` is omitted, backend falls back to legacy single-contact fields.
 
 ### Frontend prompt/form suggestion
 

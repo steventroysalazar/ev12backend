@@ -1,10 +1,14 @@
 package com.example.smsbackend.dto;
 
 import jakarta.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.util.StringUtils;
 
 public record SendConfigRequest(
     @NotNull Long deviceId,
     String imei,
+    List<DeviceContactSettings> contacts,
     String contactNumber,
     Integer contactSlot,
     Boolean contactSmsEnabled,
@@ -66,6 +70,7 @@ public record SendConfigRequest(
 
     public DeviceProtocolSettings toDeviceProtocolSettings() {
         return new DeviceProtocolSettings(
+            normalizedContacts(),
             contactNumber,
             contactSlot,
             contactSmsEnabled,
@@ -124,6 +129,26 @@ public record SendConfigRequest(
             stepDetectionInterval,
             checkStatus
         );
+    }
+
+    public List<DeviceContactSettings> normalizedContacts() {
+        if (contacts != null && !contacts.isEmpty()) {
+            return contacts;
+        }
+
+        if (!StringUtils.hasText(contactNumber)) {
+            return List.of();
+        }
+
+        List<DeviceContactSettings> result = new ArrayList<>();
+        result.add(new DeviceContactSettings(
+            contactSlot,
+            contactSmsEnabled,
+            contactCallEnabled,
+            contactNumber,
+            contactName
+        ));
+        return result;
     }
 
 }

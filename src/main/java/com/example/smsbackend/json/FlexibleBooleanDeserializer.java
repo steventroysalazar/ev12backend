@@ -54,7 +54,7 @@ public class FlexibleBooleanDeserializer extends JsonDeserializer<Boolean> {
             return null;
         }
 
-        throw context.handleUnexpectedToken(Boolean.class, parser);
+        return (Boolean) context.handleUnexpectedToken(Boolean.class, parser);
     }
 }
 

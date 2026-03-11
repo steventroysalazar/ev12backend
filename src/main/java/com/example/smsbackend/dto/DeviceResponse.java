@@ -4,6 +4,7 @@ public record DeviceResponse(
     Long id,
     Long userId,
     String name,
-    String phoneNumber
+    String phoneNumber,
+    DeviceProtocolSettings protocolSettings
 ) {
 }

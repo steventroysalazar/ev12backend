@@ -1,6 +1,7 @@
 package com.example.smsbackend.service;
 
 import com.example.smsbackend.dto.CreateDeviceRequest;
+import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
 import com.example.smsbackend.dto.UpdateUserRequest;
@@ -12,6 +13,8 @@ import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +26,18 @@ public class UserDeviceService {
     private final AppUserRepository appUserRepository;
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
+    private final ObjectMapper objectMapper;
 
     public UserDeviceService(
         AppUserRepository appUserRepository,
         DeviceRepository deviceRepository,
-        LocationRepository locationRepository
+        LocationRepository locationRepository,
+        ObjectMapper objectMapper
     ) {
         this.appUserRepository = appUserRepository;
         this.deviceRepository = deviceRepository;
         this.locationRepository = locationRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -132,6 +138,7 @@ public class UserDeviceService {
         device.setUser(user);
         device.setName(request.name().trim());
         device.setPhoneNumber(request.phoneNumber().trim());
+        device.setProtocolConfig(toProtocolSettingsJson(null));
         Device saved = deviceRepository.save(device);
         return toDeviceResponse(saved);
     }
@@ -147,6 +154,10 @@ public class UserDeviceService {
 
         if (StringUtils.hasText(request.phoneNumber())) {
             device.setPhoneNumber(request.phoneNumber().trim());
+        }
+
+        if (request.protocolSettings() != null) {
+            device.setProtocolConfig(toProtocolSettingsJson(request.protocolSettings()));
         }
 
         if (request.userId() != null) {
@@ -210,7 +221,32 @@ public class UserDeviceService {
             device.getId(),
             device.getUser().getId(),
             device.getName(),
-            device.getPhoneNumber()
+            device.getPhoneNumber(),
+            fromProtocolSettingsJson(device.getProtocolConfig())
         );
+    }
+
+    public void saveDeviceProtocolSettings(Device device, DeviceProtocolSettings settings) {
+        device.setProtocolConfig(toProtocolSettingsJson(settings));
+        deviceRepository.save(device);
+    }
+
+    private String toProtocolSettingsJson(DeviceProtocolSettings settings) {
+        try {
+            return objectMapper.writeValueAsString(settings);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Unable to store protocol settings.", exception);
+        }
+    }
+
+    private DeviceProtocolSettings fromProtocolSettingsJson(String value) {
+        if (!StringUtils.hasText(value) || "null".equals(value)) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(value, DeviceProtocolSettings.class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Unable to read protocol settings.", exception);
+        }
     }
 }

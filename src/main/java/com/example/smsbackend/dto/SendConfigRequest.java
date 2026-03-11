@@ -1,10 +1,14 @@
 package com.example.smsbackend.dto;
 
 import jakarta.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.util.StringUtils;
 
 public record SendConfigRequest(
     @NotNull Long deviceId,
     String imei,
+    List<DeviceContactSettings> contacts,
     String contactNumber,
     Integer contactSlot,
     Boolean contactSmsEnabled,
@@ -63,4 +67,88 @@ public record SendConfigRequest(
     String stepDetectionInterval,
     Boolean checkStatus
 ) {
+
+    public DeviceProtocolSettings toDeviceProtocolSettings() {
+        return new DeviceProtocolSettings(
+            normalizedContacts(),
+            contactNumber,
+            contactSlot,
+            contactSmsEnabled,
+            contactCallEnabled,
+            contactName,
+            smsPassword,
+            smsWhitelistEnabled,
+            requestLocation,
+            requestGpsLocation,
+            requestLbsLocation,
+            wifiEnabled,
+            bluetoothEnabled,
+            micVolume,
+            speakerVolume,
+            vibrationEnabled,
+            beepEnabled,
+            prefixEnabled,
+            prefixName,
+            checkBattery,
+            sosMode,
+            sosActionTime,
+            sosCallRingTime,
+            sosCallTalkTime,
+            fallDownEnabled,
+            fallDownSensitivity,
+            fallDownCall,
+            noMotionEnabled,
+            noMotionTime,
+            noMotionCall,
+            motionEnabled,
+            motionStaticTime,
+            motionDurationTime,
+            motionCall,
+            overSpeedEnabled,
+            overSpeedLimit,
+            geoFenceEnabled,
+            geoFenceMode,
+            geoFenceRadius,
+            apnEnabled,
+            apn,
+            serverEnabled,
+            serverHost,
+            serverPort,
+            gprsEnabled,
+            workingMode,
+            workingModeInterval,
+            workingModeNoMotionInterval,
+            continuousLocateInterval,
+            continuousLocateDuration,
+            timeZone,
+            turnOffDevice,
+            findMyDevice,
+            heartRateEnabled,
+            heartRateInterval,
+            stepDetectionEnabled,
+            stepDetectionInterval,
+            checkStatus
+        );
+    }
+
+    public List<DeviceContactSettings> normalizedContacts() {
+        if (contacts != null && !contacts.isEmpty()) {
+            return contacts;
+        }
+
+        if (!StringUtils.hasText(contactNumber)) {
+            return List.of();
+        }
+
+        List<DeviceContactSettings> result = new ArrayList<>();
+        result.add(new DeviceContactSettings(
+            contactSlot,
+            contactSmsEnabled,
+            contactCallEnabled,
+            contactNumber,
+            contactName
+        ));
+        return result;
+    }
+
 }

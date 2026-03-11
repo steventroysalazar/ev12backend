@@ -53,6 +53,7 @@ public class DeviceConfigController {
         @RequestHeader(value = "X-Gateway-Token", required = false) String legacyGatewayToken
     ) {
         Device device = userDeviceService.getDevice(request.deviceId());
+        userDeviceService.saveDeviceProtocolSettings(device, request.toDeviceProtocolSettings());
         List<String> commands = deviceCommandService.buildCommands(request);
         String commandPreview = deviceCommandService.buildPreview(commands);
         List<String> smsBodies = deviceCommandService.splitForSms(commandPreview);

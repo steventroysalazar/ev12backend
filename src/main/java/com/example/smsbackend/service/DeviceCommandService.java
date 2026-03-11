@@ -1,5 +1,6 @@
 package com.example.smsbackend.service;
 
+import com.example.smsbackend.dto.DeviceContactSettings;
 import com.example.smsbackend.dto.SendConfigRequest;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,17 +14,7 @@ public class DeviceCommandService {
 
     public List<String> buildCommands(SendConfigRequest request) {
         List<String> commands = new ArrayList<>();
-
-        if (StringUtils.hasText(request.contactNumber())) {
-            int slot = request.contactSlot() != null ? request.contactSlot() : 1;
-            int sms = request.contactSmsEnabled() == null || request.contactSmsEnabled() ? 1 : 0;
-            int call = request.contactCallEnabled() == null || request.contactCallEnabled() ? 1 : 0;
-            String base = "A" + slot + "," + sms + "," + call + "," + request.contactNumber().trim();
-            if (StringUtils.hasText(request.contactName())) {
-                base += "," + request.contactName().trim();
-            }
-            commands.add(base);
-        }
+        appendContactCommands(request.normalizedContacts(), commands);
         if (StringUtils.hasText(request.smsPassword())) {
             commands.add("P" + request.smsPassword().trim());
         }
@@ -127,6 +118,31 @@ public class DeviceCommandService {
         }
 
         return commands;
+    }
+
+    private void appendContactCommands(List<DeviceContactSettings> contacts, List<String> commands) {
+        if (contacts == null || contacts.isEmpty()) {
+            return;
+        }
+
+        int limit = Math.min(10, contacts.size());
+        for (int index = 0; index < limit; index++) {
+            DeviceContactSettings contact = contacts.get(index);
+            if (contact == null || !StringUtils.hasText(contact.phone())) {
+                continue;
+            }
+
+            int fallbackSlot = index + 1;
+            int slot = contact.slot() != null && contact.slot() >= 1 && contact.slot() <= 10 ? contact.slot() : fallbackSlot;
+            int sms = contact.smsEnabled() == null || contact.smsEnabled() ? 1 : 0;
+            int call = contact.callEnabled() == null || contact.callEnabled() ? 1 : 0;
+
+            String base = "A" + slot + "," + sms + "," + call + "," + contact.phone().trim();
+            if (StringUtils.hasText(contact.name())) {
+                base += "," + contact.name().trim();
+            }
+            commands.add(base);
+        }
     }
 
     public String buildPreview(List<String> commands) {

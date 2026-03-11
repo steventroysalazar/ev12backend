@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
 import com.example.smsbackend.dto.UpdateUserRequest;
 import com.example.smsbackend.entity.AppUser;
@@ -14,6 +15,7 @@ import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +40,7 @@ class UserDeviceServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository);
+        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, new ObjectMapper());
     }
 
     @Test
@@ -95,12 +97,19 @@ class UserDeviceServiceTest {
         when(appUserRepository.findById(8L)).thenReturn(Optional.of(newUser));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", 8L));
+        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", 8L, new DeviceProtocolSettings(
+            "123456789", 1, true, true, "Emma", "123456", true, true, false, false, true, false,
+            10, 90, true, true, true, "Emma", true, 1, 20, "35S", "20M", true, 5, true, true,
+            "80M", true, false, null, null, null, true, "100km/h", true, 0, "100m", true,
+            "internet", true, "www.smart-locator.com", 6060, true, "mode2", "03M", "01H",
+            "10S", "600S", "+1", false, true, true, "10M", true, "10M", true
+        )));
 
         assertEquals(9L, response.id());
         assertEquals(8L, response.userId());
         assertEquals("Renamed", response.name());
         assertEquals("222", response.phoneNumber());
+        assertEquals("123456789", response.protocolSettings().contactNumber());
     }
 
     @Test

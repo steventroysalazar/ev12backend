@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -23,6 +24,10 @@ public class Device {
 
     @Column(nullable = false, length = 32)
     private String phoneNumber;
+
+    @Lob
+    @Column(name = "protocol_config")
+    private String protocolConfig;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -54,5 +59,13 @@ public class Device {
 
     public void setUser(AppUser user) {
         this.user = user;
+    }
+
+    public String getProtocolConfig() {
+        return protocolConfig;
+    }
+
+    public void setProtocolConfig(String protocolConfig) {
+        this.protocolConfig = protocolConfig;
     }
 }

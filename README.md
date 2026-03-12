@@ -1,18 +1,86 @@
 # EV12 Backend API
 
-Spring Boot backend for user/location/device management and SMS gateway integration.
+Spring Boot backend for:
+- Authentication and user management
+- Location and device management
+- SMS gateway send/reply workflows
+- EV12 webhook ingestion
+- Device protocol configuration + SMS command delivery
 
-## Update endpoints
+## Base URL
 
-The API supports updating users, devices, and locations.
+All endpoints below are relative to your API host, for example:
+- Local: `http://localhost:8080`
 
-### 1) Update user
+## Common headers
 
-- **Method:** `PUT`
-- **Path:** `/api/users/{userId}`
+Some gateway/webhook endpoints support optional headers:
+- `Authorization`: Gateway token (preferred)
+- `X-Gateway-Token`: Legacy gateway token fallback
+- `X-Gateway-Base-Url`: Override gateway base URL for this request
+- `X-Webhook-Token`: Optional token used by webhook endpoints
 
-Request body fields are optional; only supplied fields are updated.
+---
 
+## Authentication APIs
+
+### `POST /api/auth/register`
+Create a new user.
+
+**Request body**
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "password": "StrongPassword123",
+  "contactNumber": "+15550123",
+  "address": "123 Main St",
+  "userRole": 2,
+  "locationId": 4,
+  "managerId": 7
+}
+```
+
+**Required fields**
+- `firstName`, `lastName`, `email`, `password`, `userRole`
+
+**Notes**
+- `email` must be valid.
+- `userRole`: `1=SUPER_ADMIN`, `2=MANAGER`, `3=USER`
+
+---
+
+### `POST /api/auth/login`
+Authenticate and return auth payload.
+
+**Request body**
+```json
+{
+  "email": "john@example.com",
+  "password": "StrongPassword123"
+}
+```
+
+**Required fields**
+- `email`, `password`
+
+---
+
+## User APIs
+
+### `GET /api/users`
+List users.
+
+**Query params**
+- `managerId` (optional): filter users by manager
+
+---
+
+### `PUT /api/users/{userId}`
+Update user fields (partial update behavior).
+
+**Request body (all optional)**
 ```json
 {
   "firstName": "John",
@@ -28,18 +96,55 @@ Request body fields are optional; only supplied fields are updated.
 }
 ```
 
-Notes:
-- `userRole`: `1=SUPER_ADMIN`, `2=MANAGER`, `3=USER`
-- To remove a location/manager, send `clearLocation: true` or `clearManager: true`
-- Do not send `locationId` with `clearLocation: true`
-- Do not send `managerId` with `clearManager: true`
-- Role `3` users must still have a manager assigned
+**Notes**
+- Only supplied fields are updated.
+- `clearLocation=true` removes assigned location.
+- `clearManager=true` removes assigned manager.
+- Do not send `locationId` together with `clearLocation=true`.
+- Do not send `managerId` together with `clearManager=true`.
+- Role `3` users must still have a manager.
 
-### 2) Update device
+---
 
-- **Method:** `PUT`
-- **Path:** `/api/devices/{deviceId}`
+## Device APIs
 
+### `POST /api/users/{userId}/devices`
+Create a device for a specific user.
+
+**Request body**
+```json
+{
+  "name": "Truck GPS 01",
+  "phoneNumber": "+1555999000"
+}
+```
+
+**Required fields**
+- `name`, `phoneNumber`
+
+---
+
+### `POST /api/devices`
+Create a device by specifying `userId` in body.
+
+**Request body**
+```json
+{
+  "userId": 10,
+  "name": "Truck GPS 01",
+  "phoneNumber": "+1555999000"
+}
+```
+
+**Required fields**
+- `userId`, `name`, `phoneNumber`
+
+---
+
+### `PUT /api/devices/{deviceId}`
+Update device fields (partial update behavior).
+
+**Request body (all optional)**
 ```json
 {
   "name": "Truck GPS 01",
@@ -53,89 +158,46 @@ Notes:
         "callEnabled": true,
         "phone": "123456789",
         "name": "Emma"
-      },
-      {
-        "slot": 2,
-        "smsEnabled": true,
-        "callEnabled": false,
-        "phone": "123456780",
-        "name": "Dad"
       }
     ],
-    "contactNumber": "123456789",
-    "contactSlot": 1,
-    "contactSmsEnabled": true,
-    "contactCallEnabled": true,
-    "contactName": "Emma",
     "smsPassword": "123456",
-    "smsWhitelistEnabled": true,
     "requestLocation": true,
-    "requestGpsLocation": false,
-    "requestLbsLocation": false,
-    "wifiEnabled": true,
-    "bluetoothEnabled": false,
-    "micVolume": 10,
-    "speakerVolume": 90,
-    "vibrationEnabled": true,
-    "beepEnabled": true,
-    "prefixEnabled": true,
-    "prefixName": "Emma",
-    "checkBattery": true,
-    "sosMode": 1,
-    "sosActionTime": 20,
-    "sosCallRingTime": "35S",
-    "sosCallTalkTime": "20M",
-    "fallDownEnabled": true,
-    "fallDownSensitivity": 5,
-    "fallDownCall": true,
-    "noMotionEnabled": true,
-    "noMotionTime": "80M",
-    "noMotionCall": true,
-    "motionEnabled": false,
-    "motionStaticTime": "",
-    "motionDurationTime": "",
-    "motionCall": false,
-    "overSpeedEnabled": true,
-    "overSpeedLimit": "100km/h",
-    "geoFenceEnabled": true,
-    "geoFenceMode": 0,
-    "geoFenceRadius": "100m",
-    "apnEnabled": true,
-    "apn": "internet",
-    "serverEnabled": true,
-    "serverHost": "www.smart-locator.com",
-    "serverPort": 6060,
-    "gprsEnabled": true,
     "workingMode": "mode2",
-    "workingModeInterval": "03M",
-    "workingModeNoMotionInterval": "01H",
-    "continuousLocateInterval": "10S",
-    "continuousLocateDuration": "600S",
-    "timeZone": "+1",
-    "turnOffDevice": false,
-    "findMyDevice": true,
-    "heartRateEnabled": true,
-    "heartRateInterval": "10M",
-    "stepDetectionEnabled": true,
-    "stepDetectionInterval": "10M",
-    "checkStatus": true
+    "timeZone": "+1"
   }
 }
 ```
 
-Notes:
+**Notes**
 - Any provided field is updated.
-- `userId` can reassign the device to another user.
-- `protocolSettings` lets frontend persist EV-07B / EV-04 / EV-05 SMS configuration profile per device.
-- Use `protocolSettings.contacts` to manage up to 10 contact slots (`A1`..`A10`) in one payload.
-- Legacy single-contact fields (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`) are still accepted for backward compatibility.
-- Device list/read APIs now include `protocolSettings` in each `DeviceResponse`.
+- `userId` reassigns the device.
+- `protocolSettings` persists EV protocol profile on the device record.
+- `contacts` supports up to 10 entries (`A1..A10`).
+- Legacy single-contact fields are still accepted in protocol settings (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`).
 
-### 3) Update location
+---
 
-- **Method:** `PUT`
-- **Path:** `/api/locations/{locationId}`
+### `GET /api/devices`
+List all devices.
 
+---
+
+### `GET /api/users/{userId}/devices`
+List devices for one user.
+
+---
+
+### `GET /api/locations/{locationId}/devices`
+List devices for all users under a location.
+
+---
+
+## Location APIs
+
+### `POST /api/locations`
+Create a location.
+
+**Request body**
 ```json
 {
   "name": "East Warehouse",
@@ -143,53 +205,195 @@ Notes:
 }
 ```
 
-Notes:
-- Any provided field is updated
-- To clear details, send `"details": ""`
-- Location names remain unique (case-insensitive)
+**Required fields**
+- `name`
 
 ---
 
-## Send configuration and persist device profile
+### `PUT /api/locations/{locationId}`
+Update location fields.
 
-### Endpoint
-
-- **Method:** `POST`
-- **Path:** `/api/send-config`
-
-### What happens now
-
-When frontend submits EV SMS protocol config to `/api/send-config`:
-1. Backend loads the device by `deviceId`.
-2. Backend stores the submitted configuration as `protocolSettings` for that device.
-3. Backend builds SMS commands and sends them to the device phone number.
-
-That means UI can:
-- Save profile + send in one action.
-- Reload saved values for edit forms later.
-- Use `GET /api/devices` or `GET /api/users/{userId}/devices` to prefill config UI.
-
-### Request shape
-
-`/api/send-config` request accepts the same EV settings fields shown in `protocolSettings` above, plus:
-
+**Request body (all optional)**
 ```json
 {
-  "deviceId": 123
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3"
 }
 ```
 
-Contact behavior for `/api/send-config`:
-- If `contacts` is provided, backend sends contact commands for each entry (up to 10).
-- If `contacts` is omitted, backend falls back to legacy single-contact fields.
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique (case-insensitive).
 
-### Frontend prompt/form suggestion
+---
 
-Use these sections in your UI for better UX:
-- Contacts and SOS (`A<n>`, `SOS`, `soscall`, `Loop`)
-- Positioning (`loc`, `Wifi`, BLE, GPS/LBS)
-- Safety alarms (`FL`, `Tilt`, `NMO`, `MO`, `Geo`, `Speed`, `Low`)
-- Network (`S1`, `S2/S0`, `IP1`, `GPRSHB`)
-- Working mode (`mode1..mode6`, `CL`)
-- Audio/device behavior (`Micvolume`, `Speakervolume`, `LED`, `Vibrate`, `Beep`, `TZ`)
-- EV-05 extras (`hrs`, `detpedo`, `display`, `reboot`)
+### `GET /api/locations`
+List locations.
+
+---
+
+## Message/Gateway APIs
+
+### `POST /api/messages/send`
+Send an SMS through configured gateway.
+
+**Request body**
+```json
+{
+  "to": "+1555999000",
+  "message": "Hello device",
+  "slot": 1
+}
+```
+
+**Required fields**
+- `to`, `message`
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+---
+
+### `GET /api/messages/replies`
+Fetch inbound reply messages from gateway.
+
+**Query params**
+- `phone` (optional)
+- `since` (optional)
+- `limit` (optional)
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+---
+
+### `GET /api/messages/health`
+Checks whether the gateway is reachable.
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+---
+
+### `GET /api/messages/debug/config`
+Returns resolved gateway configuration and token preview for debugging.
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+---
+
+## Device Config APIs
+
+### `POST /api/send-config`
+Persist a device protocol profile and send generated SMS commands to the device phone number.
+
+**Required request field**
+- `deviceId`
+
+**Request body shape**
+- Accepts all EV protocol fields used by UI/profile persistence, including:
+  - `contacts` array (`slot`, `smsEnabled`, `callEnabled`, `phone`, `name`)
+  - legacy contact fields (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`)
+  - safety, positioning, network, mode, and device behavior fields (for example: `requestLocation`, `wifiEnabled`, `sosMode`, `geoFenceEnabled`, `apn`, `workingMode`, `timeZone`, `heartRateEnabled`, `checkStatus`, etc.)
+
+**Example request**
+```json
+{
+  "deviceId": 123,
+  "contacts": [
+    {
+      "slot": 1,
+      "smsEnabled": true,
+      "callEnabled": true,
+      "phone": "123456789",
+      "name": "Emma"
+    }
+  ],
+  "smsPassword": "123456",
+  "requestLocation": true,
+  "wifiEnabled": true,
+  "sosMode": 1,
+  "geoFenceEnabled": true,
+  "workingMode": "mode2",
+  "timeZone": "+1",
+  "checkStatus": true
+}
+```
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+**Behavior**
+1. Loads device by `deviceId`.
+2. Stores submitted config as `protocolSettings` on device.
+3. Builds command sequence.
+4. Splits commands into SMS-sized parts.
+5. Sends all command SMS messages through gateway.
+
+---
+
+### `GET /api/inbound-messages`
+Fetch normalized inbound messages (timestamp formatted as ISO offset datetime).
+
+**Query params**
+- `since` (optional; accepts epoch seconds or epoch milliseconds)
+- `phone` (optional)
+- `limit` (optional)
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+---
+
+## EV12 Webhook APIs
+
+### `POST /api/webhooks/ev12`
+Ingest EV12 webhook payload in any content type.
+
+**Consumes**
+- `*/*` (raw body supported)
+
+**Optional headers**
+- `Content-Type`
+- `X-Webhook-Token`
+- Any other raw headers are captured
+
+**Response**
+- HTTP `201 Created`
+- Includes `{ "success": true, "event": ... }`
+
+---
+
+### `GET /api/webhooks/ev12/events`
+Return recent ingested EV12 webhook events.
+
+**Query params**
+- `limit` (optional, default `3`)
+
+**Optional headers**
+- `X-Webhook-Token`
+
+---
+
+## Notes for frontend integration
+
+- Device list/read APIs return persisted `protocolSettings` when available.
+- `/api/send-config` is the preferred "save profile + send SMS commands" flow.
+- Token precedence on gateway-backed endpoints:
+  1. `Authorization`
+  2. `X-Gateway-Token`
+  3. server config fallback

@@ -3,6 +3,8 @@ package com.example.smsbackend.controller;
 import com.example.smsbackend.dto.GatewayReplyMessage;
 import com.example.smsbackend.dto.GatewayRequestOptions;
 import com.example.smsbackend.dto.InboundMessageResponse;
+import com.example.smsbackend.dto.DeviceConfigStatusResponse;
+import com.example.smsbackend.dto.ResendConfigResponse;
 import com.example.smsbackend.dto.SendConfigRequest;
 import com.example.smsbackend.dto.SendConfigResponse;
 import com.example.smsbackend.dto.SendMessageRequest;
@@ -16,14 +18,18 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api")
@@ -64,9 +70,76 @@ public class DeviceConfigController {
         for (String body : smsBodies) {
             gatewayClientService.sendMessage(new SendMessageRequest(device.getPhoneNumber(), body, null), options);
         }
+        userDeviceService.markDeviceConfigPending(device, commandPreview, Instant.now());
 
         List<SentMessageResponse> messages = smsBodies.stream().map(SentMessageResponse::new).toList();
         return ResponseEntity.ok(new SendConfigResponse(true, device.getId(), device.getPhoneNumber(), commandPreview, messages));
+    }
+
+    @GetMapping("/devices/{deviceId}/config-status")
+    public ResponseEntity<DeviceConfigStatusResponse> configStatus(
+        @PathVariable Long deviceId,
+        @RequestHeader(value = "X-Gateway-Base-Url", required = false) String gatewayBaseUrl,
+        @RequestHeader(value = "Authorization", required = false) String gatewayToken,
+        @RequestHeader(value = "X-Gateway-Token", required = false) String legacyGatewayToken
+    ) {
+        Device device = userDeviceService.getDevice(deviceId);
+        String resolvedToken = gatewayToken != null && !gatewayToken.isBlank() ? gatewayToken : legacyGatewayToken;
+        GatewayRequestOptions options = new GatewayRequestOptions(gatewayBaseUrl, resolvedToken);
+        syncPendingStatus(device, options);
+
+        Instant nextResendAt = userDeviceService.nextResendAt(device);
+        return ResponseEntity.ok(new DeviceConfigStatusResponse(
+            device.getId(),
+            device.getConfigStatus(),
+            UserDeviceService.CONFIG_STATUS_PENDING.equals(device.getConfigStatus()),
+            device.getConfigLastSentAt(),
+            device.getConfigAppliedAt(),
+            nextResendAt,
+            device.getConfigCommandPreview()
+        ));
+    }
+
+    @PostMapping("/devices/{deviceId}/config-resend")
+    public ResponseEntity<ResendConfigResponse> resendConfig(
+        @PathVariable Long deviceId,
+        @RequestHeader(value = "X-Gateway-Base-Url", required = false) String gatewayBaseUrl,
+        @RequestHeader(value = "Authorization", required = false) String gatewayToken,
+        @RequestHeader(value = "X-Gateway-Token", required = false) String legacyGatewayToken
+    ) {
+        Device device = userDeviceService.getDevice(deviceId);
+        String resolvedToken = gatewayToken != null && !gatewayToken.isBlank() ? gatewayToken : legacyGatewayToken;
+        GatewayRequestOptions options = new GatewayRequestOptions(gatewayBaseUrl, resolvedToken);
+
+        syncPendingStatus(device, options);
+
+        if (!UserDeviceService.CONFIG_STATUS_PENDING.equals(device.getConfigStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending device configuration to resend.");
+        }
+        if (!StringUtils.hasText(device.getConfigCommandPreview())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing command preview for pending configuration.");
+        }
+
+        Instant now = Instant.now();
+        if (!userDeviceService.canResend(device, now)) {
+            Instant nextAllowed = userDeviceService.nextResendAt(device);
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                "Config resend is allowed every 5 minutes. Try again at " + FORMATTER.format(nextAllowed.atOffset(ZoneOffset.UTC)) + ".");
+        }
+
+        List<String> smsBodies = deviceCommandService.splitForSms(device.getConfigCommandPreview());
+        for (String body : smsBodies) {
+            gatewayClientService.sendMessage(new SendMessageRequest(device.getPhoneNumber(), body, null), options);
+        }
+        userDeviceService.markDeviceConfigPending(device, device.getConfigCommandPreview(), now);
+
+        return ResponseEntity.ok(new ResendConfigResponse(
+            true,
+            device.getId(),
+            device.getConfigStatus(),
+            device.getConfigLastSentAt(),
+            smsBodies.stream().map(SentMessageResponse::new).toList()
+        ));
     }
 
     @GetMapping("/inbound-messages")
@@ -104,5 +177,23 @@ public class DeviceConfigController {
         }
 
         return since;
+    }
+
+    private void syncPendingStatus(Device device, GatewayRequestOptions options) {
+        if (!UserDeviceService.CONFIG_STATUS_PENDING.equals(device.getConfigStatus()) || device.getConfigLastSentAt() == null) {
+            return;
+        }
+
+        List<GatewayReplyMessage> replies = gatewayClientService.fetchMessages(
+            device.getPhoneNumber(),
+            device.getConfigLastSentAt().toEpochMilli(),
+            20,
+            options
+        );
+
+        replies.stream()
+            .filter(message -> device.getConfigLastSentAt() == null || message.date() >= device.getConfigLastSentAt().toEpochMilli())
+            .findFirst()
+            .ifPresent(message -> userDeviceService.markDeviceConfigApplied(device, Instant.ofEpochMilli(message.date())));
     }
 }

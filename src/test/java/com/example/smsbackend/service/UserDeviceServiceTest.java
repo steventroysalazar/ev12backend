@@ -1,7 +1,9 @@
 package com.example.smsbackend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +19,7 @@ import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -138,5 +141,33 @@ class UserDeviceServiceTest {
             null,
             true
         )));
+    }
+
+    @Test
+    void markDeviceConfigPending_setsQueueState() {
+        Device device = new Device();
+        Instant sentAt = Instant.parse("2026-03-12T09:30:00Z");
+
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.markDeviceConfigPending(device, "loc,status", sentAt);
+
+        assertEquals(UserDeviceService.CONFIG_STATUS_PENDING, device.getConfigStatus());
+        assertEquals("loc,status", device.getConfigCommandPreview());
+        assertEquals(sentAt, device.getConfigLastSentAt());
+        assertEquals(null, device.getConfigAppliedAt());
+    }
+
+    @Test
+    void canResend_requiresPendingAndCooldown() {
+        Device device = new Device();
+        device.setConfigStatus(UserDeviceService.CONFIG_STATUS_PENDING);
+        device.setConfigLastSentAt(Instant.parse("2026-03-12T09:30:00Z"));
+
+        assertFalse(service.canResend(device, Instant.parse("2026-03-12T09:34:59Z")));
+        assertTrue(service.canResend(device, Instant.parse("2026-03-12T09:35:00Z")));
+
+        device.setConfigStatus(UserDeviceService.CONFIG_STATUS_APPLIED);
+        assertFalse(service.canResend(device, Instant.parse("2026-03-12T09:40:00Z")));
     }
 }

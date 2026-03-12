@@ -21,6 +21,7 @@ class DeviceCommandServiceTest {
         SendConfigRequest request = new SendConfigRequest(
             1L,
             null,
+            null,
             contacts,
             null,
             null,
@@ -92,6 +93,7 @@ class DeviceCommandServiceTest {
     void buildCommands_keepsLegacySingleContactPayloadCompatible() {
         SendConfigRequest request = new SendConfigRequest(
             1L,
+            null,
             null,
             null,
             "123456789",

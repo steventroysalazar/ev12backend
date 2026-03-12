@@ -4,6 +4,8 @@ import java.util.List;
 
 public record DeviceProtocolSettings(
     List<DeviceContactSettings> contacts,
+    String imei,
+    String eviewVersion,
     String contactNumber,
     Integer contactSlot,
     Boolean contactSmsEnabled,

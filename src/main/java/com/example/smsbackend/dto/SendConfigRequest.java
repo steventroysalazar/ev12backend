@@ -8,6 +8,7 @@ import org.springframework.util.StringUtils;
 public record SendConfigRequest(
     @NotNull Long deviceId,
     String imei,
+    String eviewVersion,
     List<DeviceContactSettings> contacts,
     String contactNumber,
     Integer contactSlot,
@@ -71,6 +72,8 @@ public record SendConfigRequest(
     public DeviceProtocolSettings toDeviceProtocolSettings() {
         return new DeviceProtocolSettings(
             normalizedContacts(),
+            imei,
+            eviewVersion,
             contactNumber,
             contactSlot,
             contactSmsEnabled,

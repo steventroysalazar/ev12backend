@@ -172,6 +172,10 @@ Update device fields (partial update behavior).
 - Any provided field is updated.
 - `userId` reassigns the device.
 - `protocolSettings` persists EV protocol profile on the device record.
+- Device responses now include config queue tracking fields:
+  - `configStatus`: `IDLE`, `PENDING`, `APPLIED`
+  - `configLastSentAt`: UTC timestamp of the last configuration SMS send
+  - `configAppliedAt`: UTC timestamp when a device reply confirmed config applied
 - `contacts` supports up to 10 entries (`A1..A10`).
 - Legacy single-contact fields are still accepted in protocol settings (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`).
 
@@ -344,6 +348,63 @@ Persist a device protocol profile and send generated SMS commands to the device 
 3. Builds command sequence.
 4. Splits commands into SMS-sized parts.
 5. Sends all command SMS messages through gateway.
+6. Marks device config status as `PENDING` and starts resend cooldown timer.
+
+---
+
+### `GET /api/devices/{deviceId}/config-status`
+Returns current queue status for the latest configuration request and auto-checks for device reply confirmation.
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+**Behavior**
+- If status is `PENDING`, backend fetches inbound messages for the device number since the last config send time.
+- If at least one reply exists, status becomes `APPLIED` and `configAppliedAt` is stored.
+- Response includes `nextResendAt` so frontend can enable/disable resend button.
+
+**Example response**
+```json
+{
+  "deviceId": 123,
+  "status": "PENDING",
+  "pending": true,
+  "lastSentAt": "2026-03-12T09:30:00Z",
+  "appliedAt": null,
+  "nextResendAt": "2026-03-12T09:35:00Z",
+  "commandPreview": "A1,1,1,123456789,Emma,P123456,loc"
+}
+```
+
+---
+
+### `POST /api/devices/{deviceId}/config-resend`
+Resends the pending device configuration SMS command payload.
+
+**Optional headers**
+- `Authorization`
+- `X-Gateway-Token`
+- `X-Gateway-Base-Url`
+
+**Rules**
+- Works only if latest config status is `PENDING`.
+- Can be called only once every 5 minutes (HTTP `429` if called too soon).
+- Before resending, backend auto-checks for confirmation reply; if already confirmed, resend is rejected.
+
+**Example response**
+```json
+{
+  "success": true,
+  "deviceId": 123,
+  "status": "PENDING",
+  "sentAt": "2026-03-12T09:35:00Z",
+  "messages": [
+    { "message": "A1,1,1,123456789,Emma,P123456,loc" }
+  ]
+}
+```
 
 ---
 

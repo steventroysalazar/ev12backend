@@ -15,6 +15,8 @@ import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,11 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class UserDeviceService {
+
+    public static final String CONFIG_STATUS_IDLE = "IDLE";
+    public static final String CONFIG_STATUS_PENDING = "PENDING";
+    public static final String CONFIG_STATUS_APPLIED = "APPLIED";
+    public static final Duration CONFIG_RESEND_COOLDOWN = Duration.ofMinutes(5);
 
     private final AppUserRepository appUserRepository;
     private final DeviceRepository deviceRepository;
@@ -222,13 +229,47 @@ public class UserDeviceService {
             device.getUser().getId(),
             device.getName(),
             device.getPhoneNumber(),
-            fromProtocolSettingsJson(device.getProtocolConfig())
+            fromProtocolSettingsJson(device.getProtocolConfig()),
+            device.getConfigStatus(),
+            device.getConfigLastSentAt(),
+            device.getConfigAppliedAt()
         );
     }
 
     public void saveDeviceProtocolSettings(Device device, DeviceProtocolSettings settings) {
         device.setProtocolConfig(toProtocolSettingsJson(settings));
         deviceRepository.save(device);
+    }
+
+    public void markDeviceConfigPending(Device device, String commandPreview, Instant sentAt) {
+        device.setConfigStatus(CONFIG_STATUS_PENDING);
+        device.setConfigCommandPreview(commandPreview);
+        device.setConfigLastSentAt(sentAt);
+        device.setConfigAppliedAt(null);
+        deviceRepository.save(device);
+    }
+
+    public void markDeviceConfigApplied(Device device, Instant appliedAt) {
+        device.setConfigStatus(CONFIG_STATUS_APPLIED);
+        device.setConfigAppliedAt(appliedAt);
+        deviceRepository.save(device);
+    }
+
+    public Instant nextResendAt(Device device) {
+        if (device.getConfigLastSentAt() == null) {
+            return Instant.now();
+        }
+        return device.getConfigLastSentAt().plus(CONFIG_RESEND_COOLDOWN);
+    }
+
+    public boolean canResend(Device device, Instant now) {
+        if (!CONFIG_STATUS_PENDING.equals(device.getConfigStatus())) {
+            return false;
+        }
+        if (device.getConfigLastSentAt() == null) {
+            return true;
+        }
+        return !now.isBefore(nextResendAt(device));
     }
 
     private String toProtocolSettingsJson(DeviceProtocolSettings settings) {

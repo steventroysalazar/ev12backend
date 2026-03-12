@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 
 @Entity
 @Table(name = "devices")
@@ -32,6 +33,19 @@ public class Device {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;
+
+    @Column(name = "config_status", nullable = false, length = 24)
+    private String configStatus = "IDLE";
+
+    @Lob
+    @Column(name = "config_command_preview")
+    private String configCommandPreview;
+
+    @Column(name = "config_last_sent_at")
+    private Instant configLastSentAt;
+
+    @Column(name = "config_applied_at")
+    private Instant configAppliedAt;
 
     public Long getId() {
         return id;
@@ -67,5 +81,37 @@ public class Device {
 
     public void setProtocolConfig(String protocolConfig) {
         this.protocolConfig = protocolConfig;
+    }
+
+    public String getConfigStatus() {
+        return configStatus;
+    }
+
+    public void setConfigStatus(String configStatus) {
+        this.configStatus = configStatus;
+    }
+
+    public String getConfigCommandPreview() {
+        return configCommandPreview;
+    }
+
+    public void setConfigCommandPreview(String configCommandPreview) {
+        this.configCommandPreview = configCommandPreview;
+    }
+
+    public Instant getConfigLastSentAt() {
+        return configLastSentAt;
+    }
+
+    public void setConfigLastSentAt(Instant configLastSentAt) {
+        this.configLastSentAt = configLastSentAt;
+    }
+
+    public Instant getConfigAppliedAt() {
+        return configAppliedAt;
+    }
+
+    public void setConfigAppliedAt(Instant configAppliedAt) {
+        this.configAppliedAt = configAppliedAt;
     }
 }

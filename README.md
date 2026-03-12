@@ -304,12 +304,15 @@ Persist a device protocol profile and send generated SMS commands to the device 
 - Accepts all EV protocol fields used by UI/profile persistence, including:
   - `contacts` array (`slot`, `smsEnabled`, `callEnabled`, `phone`, `name`)
   - legacy contact fields (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`)
+  - device metadata fields (`imei`, `eviewVersion`)
   - safety, positioning, network, mode, and device behavior fields (for example: `requestLocation`, `wifiEnabled`, `sosMode`, `geoFenceEnabled`, `apn`, `workingMode`, `timeZone`, `heartRateEnabled`, `checkStatus`, etc.)
 
 **Example request**
 ```json
 {
   "deviceId": 123,
+  "imei": "860000000000001",
+  "eviewVersion": "1.0.5",
   "contacts": [
     {
       "slot": 1,

@@ -18,12 +18,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
 public class UserDeviceService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserDeviceService.class);
 
     public static final String CONFIG_STATUS_IDLE = "IDLE";
     public static final String CONFIG_STATUS_PENDING = "PENDING";
@@ -287,7 +291,8 @@ public class UserDeviceService {
         try {
             return objectMapper.readValue(value, DeviceProtocolSettings.class);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Unable to read protocol settings.", exception);
+            LOGGER.warn("Unable to read protocol settings JSON for device payload. Returning null settings.", exception);
+            return null;
         }
     }
 }

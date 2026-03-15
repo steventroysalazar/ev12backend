@@ -143,6 +143,28 @@ class UserDeviceServiceTest {
         )));
     }
 
+
+    @Test
+    void listAllDevices_ignoresInvalidProtocolSettingsJson() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 12L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 99L);
+        device.setUser(user);
+        device.setName("Tracker");
+        device.setPhoneNumber("+111");
+        device.setProtocolConfig("{not-valid-json}");
+
+        when(deviceRepository.findAll()).thenReturn(java.util.List.of(device));
+
+        var response = service.listAllDevices();
+
+        assertEquals(1, response.size());
+        assertEquals(99L, response.get(0).id());
+        assertEquals(null, response.get(0).protocolSettings());
+    }
+
     @Test
     void markDeviceConfigPending_setsQueueState() {
         Device device = new Device();

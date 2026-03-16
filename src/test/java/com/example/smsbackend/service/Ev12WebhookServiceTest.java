@@ -89,4 +89,24 @@ class Ev12WebhookServiceTest {
 
         assertEquals(4, events.size());
     }
+
+    @Test
+    void clearEventsShouldRemoveAllStoredEvents() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper);
+
+        service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
+        service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
+
+        int deleted = service.clearEvents(null);
+
+        assertEquals(2, deleted);
+        assertEquals(0, service.recentEvents(null, null).size());
+    }
+
+    @Test
+    void clearEventsShouldRequireTokenWhenConfigured() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper);
+
+        assertThrows(ResponseStatusException.class, () -> service.clearEvents("wrong"));
+    }
 }

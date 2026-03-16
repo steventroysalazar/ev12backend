@@ -453,10 +453,24 @@ Return recent ingested EV12 webhook events.
 
 ---
 
+### `DELETE /api/webhooks/ev12/events`
+Clear stored EV12 webhook history.
+
+**Optional headers**
+- `X-Webhook-Token`
+
+**Response**
+- HTTP `200 OK`
+- Includes `{ "success": true, "deleted": <count> }`
+
+---
+
 ## Notes for frontend integration
 
 - Device list/read APIs return persisted `protocolSettings` when available.
 - `/api/send-config` is the preferred "save profile + send SMS commands" flow.
+
+- For a "Delete Webhook History" button in your frontend, call `DELETE /api/webhooks/ev12/events` and then refresh the table/list with `GET /api/webhooks/ev12/events`.
 - Token precedence on gateway-backed endpoints:
   1. `Authorization`
   2. `X-Gateway-Token`

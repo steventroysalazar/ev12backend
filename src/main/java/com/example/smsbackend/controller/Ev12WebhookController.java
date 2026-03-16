@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +36,17 @@ public class Ev12WebhookController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
             "success", true,
             "event", saved
+        ));
+    }
+
+    @DeleteMapping("/ev12/events")
+    public ResponseEntity<Map<String, Object>> clearEvents(
+        @RequestHeader(value = "X-Webhook-Token", required = false) String webhookToken
+    ) {
+        int deleted = ev12WebhookService.clearEvents(webhookToken);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "deleted", deleted
         ));
     }
 

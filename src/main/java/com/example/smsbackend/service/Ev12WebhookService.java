@@ -22,8 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Ev12WebhookService {
 
-    private static final int MAX_EVENTS = 3;
-
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final AtomicLong eventIdSequence = new AtomicLong(1);
@@ -52,17 +50,19 @@ public class Ev12WebhookService {
         );
 
         recentEvents.addFirst(event);
-        while (recentEvents.size() > MAX_EVENTS) {
-            recentEvents.removeLast();
-        }
-
         return event;
     }
 
-    public synchronized List<Ev12WebhookEventResponse> recentEvents(int limit, String providedToken) {
+    public synchronized List<Ev12WebhookEventResponse> recentEvents(Integer limit, String providedToken) {
         validateToken(providedToken);
-        int normalizedLimit = Math.max(1, Math.min(limit, MAX_EVENTS));
-        return new ArrayList<>(recentEvents).stream()
+
+        List<Ev12WebhookEventResponse> events = new ArrayList<>(recentEvents);
+        if (limit == null) {
+            return events;
+        }
+
+        int normalizedLimit = Math.max(1, limit);
+        return events.stream()
             .limit(normalizedLimit)
             .toList();
     }

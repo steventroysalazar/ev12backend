@@ -63,7 +63,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void recentEventsShouldOnlyReturnLatestThreeEvents() {
+    void recentEventsShouldApplyRequestedLimitWithoutHardCap() {
         Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper);
 
         service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
@@ -71,8 +71,22 @@ class Ev12WebhookServiceTest {
         service.ingest("{\"seq\":3}".getBytes(), "application/json", null, Map.of());
         service.ingest("{\"seq\":4}".getBytes(), "application/json", null, Map.of());
 
-        List<Ev12WebhookEventResponse> events = service.recentEvents(20, null);
+        List<Ev12WebhookEventResponse> events = service.recentEvents(2, null);
 
-        assertEquals(3, events.size());
+        assertEquals(2, events.size());
+    }
+
+    @Test
+    void recentEventsShouldReturnAllEventsWithoutCap() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper);
+
+        service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
+        service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
+        service.ingest("{\"seq\":3}".getBytes(), "application/json", null, Map.of());
+        service.ingest("{\"seq\":4}".getBytes(), "application/json", null, Map.of());
+
+        List<Ev12WebhookEventResponse> events = service.recentEvents(null, null);
+
+        assertEquals(4, events.size());
     }
 }

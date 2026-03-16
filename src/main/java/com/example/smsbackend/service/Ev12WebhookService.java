@@ -67,6 +67,14 @@ public class Ev12WebhookService {
             .toList();
     }
 
+    public synchronized int clearEvents(String providedToken) {
+        validateToken(providedToken);
+
+        int deletedCount = recentEvents.size();
+        recentEvents.clear();
+        return deletedCount;
+    }
+
     private String serializePayload(byte[] rawPayload, String contentType, Map<String, String> rawHeaders) {
         Map<String, Object> payloadEnvelope = new LinkedHashMap<>();
         payloadEnvelope.put("rawHeaders", rawHeaders == null ? Map.of() : rawHeaders);

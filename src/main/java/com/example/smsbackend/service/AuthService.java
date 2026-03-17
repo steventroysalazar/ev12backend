@@ -5,9 +5,11 @@ import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.dto.LoginRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
+import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
+import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -23,11 +25,17 @@ public class AuthService {
 
     private final AppUserRepository appUserRepository;
     private final LocationRepository locationRepository;
+    private final DeviceRepository deviceRepository;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService(AppUserRepository appUserRepository, LocationRepository locationRepository) {
+    public AuthService(
+        AppUserRepository appUserRepository,
+        LocationRepository locationRepository,
+        DeviceRepository deviceRepository
+    ) {
         this.appUserRepository = appUserRepository;
         this.locationRepository = locationRepository;
+        this.deviceRepository = deviceRepository;
     }
 
     @Transactional
@@ -67,6 +75,21 @@ public class AuthService {
         }
 
         AppUser saved = appUserRepository.save(user);
+
+        if (request.device() != null) {
+            String externalDeviceId = request.device().deviceId().trim();
+            deviceRepository.findByExternalDeviceId(externalDeviceId).ifPresent(existing -> {
+                throw new IllegalArgumentException("Device with that deviceId already exists.");
+            });
+
+            Device device = new Device();
+            device.setUser(saved);
+            device.setName(request.device().name().trim());
+            device.setPhoneNumber(request.device().phoneNumber().trim());
+            device.setExternalDeviceId(externalDeviceId);
+            deviceRepository.save(device);
+        }
+
         return toUserResponse(saved);
     }
 

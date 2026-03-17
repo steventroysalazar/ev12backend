@@ -7,6 +7,8 @@ public record DeviceResponse(
     Long userId,
     String name,
     String phoneNumber,
+    String externalDeviceId,
+    String alarmCode,
     DeviceProtocolSettings protocolSettings,
     String configStatus,
     Instant configLastSentAt,

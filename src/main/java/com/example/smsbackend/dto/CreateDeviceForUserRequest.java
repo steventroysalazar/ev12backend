@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 public record CreateDeviceForUserRequest(
     @NotNull Long userId,
     @NotBlank String name,
-    @NotBlank String phoneNumber
+    @NotBlank String phoneNumber,
+    String externalDeviceId
 ) {
 }

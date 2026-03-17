@@ -101,7 +101,7 @@ class UserDeviceServiceTest {
         when(appUserRepository.findById(8L)).thenReturn(Optional.of(newUser));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", 8L, new DeviceProtocolSettings(
+        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", "862667084205114", 8L, new DeviceProtocolSettings(
             java.util.List.of(new DeviceContactSettings(1, true, true, "123456789", "Emma")),
             "860000000000001", "1.0.5",
             "123456789", 1, true, true, "Emma", "123456", true, true, false, false, true, false,
@@ -115,6 +115,7 @@ class UserDeviceServiceTest {
         assertEquals(8L, response.userId());
         assertEquals("Renamed", response.name());
         assertEquals("222", response.phoneNumber());
+        assertEquals("862667084205114", response.externalDeviceId());
         assertEquals("860000000000001", response.protocolSettings().imei());
         assertEquals("1.0.5", response.protocolSettings().eviewVersion());
         assertEquals("123456789", response.protocolSettings().contactNumber());

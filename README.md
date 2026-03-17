@@ -115,12 +115,16 @@ Create a device for a specific user.
 ```json
 {
   "name": "Truck GPS 01",
-  "phoneNumber": "+1555999000"
+  "phoneNumber": "+1555999000",
+  "externalDeviceId": "862667084205114"
 }
 ```
 
 **Required fields**
 - `name`, `phoneNumber`
+
+**Optional fields**
+- `externalDeviceId`: EV12 `deviceId` used for webhook alarm mapping
 
 ---
 
@@ -132,12 +136,16 @@ Create a device by specifying `userId` in body.
 {
   "userId": 10,
   "name": "Truck GPS 01",
-  "phoneNumber": "+1555999000"
+  "phoneNumber": "+1555999000",
+  "externalDeviceId": "862667084205114"
 }
 ```
 
 **Required fields**
 - `userId`, `name`, `phoneNumber`
+
+**Optional fields**
+- `externalDeviceId`: EV12 `deviceId` used for webhook alarm mapping
 
 ---
 
@@ -149,6 +157,7 @@ Update device fields (partial update behavior).
 {
   "name": "Truck GPS 01",
   "phoneNumber": "+1555999000",
+  "externalDeviceId": "862667084205114",
   "userId": 10,
   "protocolSettings": {
     "contacts": [
@@ -172,6 +181,9 @@ Update device fields (partial update behavior).
 - Any provided field is updated.
 - `userId` reassigns the device.
 - `protocolSettings` persists EV protocol profile on the device record.
+- `externalDeviceId` links the API device to EV12 webhook payload `deviceId`.
+- Device responses include alarm tracking fields for frontend state:
+  - `alarmCode`: current active alarm (`SOS Alert`, `Fall-Down Alert`, or `null` when cancelled/idle)
 - Device responses now include config queue tracking fields:
   - `configStatus`: `IDLE`, `PENDING`, `APPLIED`
   - `configLastSentAt`: UTC timestamp of the last configuration SMS send
@@ -441,6 +453,13 @@ Ingest EV12 webhook payload in any content type.
 - Includes `{ "success": true, "event": ... }`
 
 ---
+
+
+**Alarm code tracking behavior**
+- When webhook `data["Alarm Code"]` includes `SOS Alert` and does **not** include `SOS Ending`, device `alarmCode` is set to `SOS Alert`.
+- When webhook `data["Alarm Code"]` includes `Fall-Down Alert` (and no `SOS Ending`), device `alarmCode` is set to `Fall-Down Alert`.
+- When webhook `data["Alarm Code"]` includes `SOS Ending`, device `alarmCode` is cleared to `null` (alarm cancelled).
+- Alarm updates apply only when the webhook `deviceId` matches a device `externalDeviceId`.
 
 ### `GET /api/webhooks/ev12/events`
 Return recent ingested EV12 webhook events.

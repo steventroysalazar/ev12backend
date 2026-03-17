@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record CreateDeviceRequest(
     @NotBlank String name,
-    @NotBlank String phoneNumber
+    @NotBlank String phoneNumber,
+    String externalDeviceId
 ) {
 }

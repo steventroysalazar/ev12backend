@@ -2,7 +2,10 @@ package com.example.smsbackend.service;
 
 import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
+import com.example.smsbackend.entity.Device;
+import com.example.smsbackend.repository.DeviceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -16,25 +19,34 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class Ev12WebhookService {
 
+    private static final String SOS_ALERT = "SOS Alert";
+    private static final String SOS_ENDING = "SOS Ending";
+    private static final String FALL_DOWN_ALERT = "Fall-Down Alert";
+
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
+    private final DeviceRepository deviceRepository;
     private final AtomicLong eventIdSequence = new AtomicLong(1);
     private final Deque<Ev12WebhookEventResponse> recentEvents = new ArrayDeque<>();
 
     public Ev12WebhookService(
         WebhookProperties webhookProperties,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        DeviceRepository deviceRepository
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
+        this.deviceRepository = deviceRepository;
     }
 
+    @Transactional
     public synchronized Ev12WebhookEventResponse ingest(
         byte[] rawPayload,
         String contentType,
@@ -42,6 +54,7 @@ public class Ev12WebhookService {
         Map<String, String> rawHeaders
     ) {
         validateToken(providedToken);
+        updateDeviceAlarmCode(rawPayload);
 
         Ev12WebhookEventResponse event = new Ev12WebhookEventResponse(
             eventIdSequence.getAndIncrement(),
@@ -73,6 +86,63 @@ public class Ev12WebhookService {
         int deletedCount = recentEvents.size();
         recentEvents.clear();
         return deletedCount;
+    }
+
+    private void updateDeviceAlarmCode(byte[] rawPayload) {
+        if (rawPayload == null || rawPayload.length == 0) {
+            return;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
+            String externalDeviceId = root.path("deviceId").asText(null);
+            if (!StringUtils.hasText(externalDeviceId)) {
+                return;
+            }
+
+            JsonNode alarmCodeNode = root.path("data").path("Alarm Code");
+            if (!alarmCodeNode.isArray()) {
+                return;
+            }
+
+            String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
+            if (nextAlarmCode == null && !containsCode(alarmCodeNode, SOS_ENDING)) {
+                return;
+            }
+
+            Device device = deviceRepository.findByExternalDeviceId(externalDeviceId.trim())
+                .orElse(null);
+            if (device == null) {
+                return;
+            }
+
+            device.setAlarmCode(nextAlarmCode);
+            deviceRepository.save(device);
+        } catch (Exception ignored) {
+            // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
+        }
+    }
+
+    private String deriveAlarmCode(JsonNode alarmCodeNode) {
+        if (containsCode(alarmCodeNode, SOS_ENDING)) {
+            return null;
+        }
+        if (containsCode(alarmCodeNode, SOS_ALERT)) {
+            return SOS_ALERT;
+        }
+        if (containsCode(alarmCodeNode, FALL_DOWN_ALERT)) {
+            return FALL_DOWN_ALERT;
+        }
+        return null;
+    }
+
+    private boolean containsCode(JsonNode alarmCodeNode, String code) {
+        for (JsonNode item : alarmCodeNode) {
+            if (code.equalsIgnoreCase(item.asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String serializePayload(byte[] rawPayload, String contentType, Map<String, String> rawHeaders) {

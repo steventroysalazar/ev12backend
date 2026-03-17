@@ -59,7 +59,7 @@ public class UserController {
 
     @PostMapping("/devices")
     public ResponseEntity<DeviceResponse> createDeviceForUser(@Valid @RequestBody CreateDeviceForUserRequest request) {
-        CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber());
+        CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber(), request.externalDeviceId());
         return ResponseEntity.ok(userDeviceService.createDevice(request.userId(), createDeviceRequest));
     }
 

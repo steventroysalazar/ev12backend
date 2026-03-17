@@ -26,6 +26,12 @@ public class Device {
     @Column(nullable = false, length = 32)
     private String phoneNumber;
 
+    @Column(name = "external_device_id", length = 64, unique = true)
+    private String externalDeviceId;
+
+    @Column(name = "alarm_code", length = 64)
+    private String alarmCode;
+
     @Lob
     @Column(name = "protocol_config")
     private String protocolConfig;
@@ -65,6 +71,22 @@ public class Device {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public String getExternalDeviceId() {
+        return externalDeviceId;
+    }
+
+    public void setExternalDeviceId(String externalDeviceId) {
+        this.externalDeviceId = externalDeviceId;
+    }
+
+    public String getAlarmCode() {
+        return alarmCode;
+    }
+
+    public void setAlarmCode(String alarmCode) {
+        this.alarmCode = alarmCode;
     }
 
     public AppUser getUser() {

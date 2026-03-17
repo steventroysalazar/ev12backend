@@ -149,6 +149,7 @@ public class UserDeviceService {
         device.setUser(user);
         device.setName(request.name().trim());
         device.setPhoneNumber(request.phoneNumber().trim());
+        device.setExternalDeviceId(trimOrNull(request.externalDeviceId()));
         device.setProtocolConfig(toProtocolSettingsJson(null));
         Device saved = deviceRepository.save(device);
         return toDeviceResponse(saved);
@@ -165,6 +166,10 @@ public class UserDeviceService {
 
         if (StringUtils.hasText(request.phoneNumber())) {
             device.setPhoneNumber(request.phoneNumber().trim());
+        }
+
+        if (request.externalDeviceId() != null) {
+            device.setExternalDeviceId(trimOrNull(request.externalDeviceId()));
         }
 
         if (request.protocolSettings() != null) {
@@ -233,6 +238,8 @@ public class UserDeviceService {
             device.getUser().getId(),
             device.getName(),
             device.getPhoneNumber(),
+            device.getExternalDeviceId(),
+            device.getAlarmCode(),
             fromProtocolSettingsJson(device.getProtocolConfig()),
             device.getConfigStatus(),
             device.getConfigLastSentAt(),

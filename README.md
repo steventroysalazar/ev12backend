@@ -38,7 +38,12 @@ Create a new user.
   "address": "123 Main St",
   "userRole": 2,
   "locationId": 4,
-  "managerId": 7
+  "managerId": 7,
+  "device": {
+    "name": "Truck GPS 01",
+    "phoneNumber": "+1555999000",
+    "deviceId": "862667084205114"
+  }
 }
 ```
 
@@ -48,6 +53,8 @@ Create a new user.
 **Notes**
 - `email` must be valid.
 - `userRole`: `1=SUPER_ADMIN`, `2=MANAGER`, `3=USER`
+- `device` is optional, but when provided it creates a device during registration.
+- `device.deviceId` is stored as `externalDeviceId` and used to map EV12 webhook `deviceId` to this device.
 
 ---
 

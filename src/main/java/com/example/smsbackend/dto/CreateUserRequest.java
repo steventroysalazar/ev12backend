@@ -3,6 +3,7 @@ package com.example.smsbackend.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 
 public record CreateUserRequest(
     @NotBlank String firstName,
@@ -13,6 +14,7 @@ public record CreateUserRequest(
     String address,
     @NotNull Integer userRole,
     Long locationId,
-    Long managerId
+    Long managerId,
+    @Valid CreateUserDeviceRequest device
 ) {
 }

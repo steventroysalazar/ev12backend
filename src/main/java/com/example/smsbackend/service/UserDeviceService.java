@@ -182,6 +182,14 @@ public class UserDeviceService {
             device.setUser(user);
         }
 
+        if (request.alarmCodeProvided()) {
+            device.setAlarmCode(trimOrNull(request.alarmCode()));
+        }
+
+        if (request.alarmCancelledAtProvided()) {
+            device.setAlarmCancelledAt(request.alarmCancelledAt());
+        }
+
         Device saved = deviceRepository.save(device);
         return toDeviceResponse(saved);
     }
@@ -240,6 +248,7 @@ public class UserDeviceService {
             device.getPhoneNumber(),
             device.getExternalDeviceId(),
             device.getAlarmCode(),
+            device.getAlarmCancelledAt(),
             fromProtocolSettingsJson(device.getProtocolConfig()),
             device.getConfigStatus(),
             device.getConfigLastSentAt(),

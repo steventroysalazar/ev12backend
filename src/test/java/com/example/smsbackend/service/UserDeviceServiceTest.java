@@ -122,6 +122,31 @@ class UserDeviceServiceTest {
         assertEquals(1, response.protocolSettings().contacts().size());
     }
 
+
+    @Test
+    void updateDevice_allowsAlarmCancelPayload() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 7L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 9L);
+        device.setUser(user);
+        device.setAlarmCode("SOS Alert");
+
+        when(deviceRepository.findById(9L)).thenReturn(Optional.of(device));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDeviceRequest request = new UpdateDeviceRequest();
+        request.setAlarmCode(null);
+        Instant cancelledAt = Instant.parse("2026-03-22T22:00:00Z");
+        request.setAlarmCancelledAt(cancelledAt);
+
+        var response = service.updateDevice(9L, request);
+
+        assertEquals(null, response.alarmCode());
+        assertEquals(cancelledAt, response.alarmCancelledAt());
+    }
+
     @Test
     void updateUser_rejectsRole3WithoutManager() {
         AppUser user = new AppUser();

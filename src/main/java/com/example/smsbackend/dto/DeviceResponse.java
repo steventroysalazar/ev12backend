@@ -9,6 +9,7 @@ public record DeviceResponse(
     String phoneNumber,
     String externalDeviceId,
     String alarmCode,
+    Instant alarmCancelledAt,
     DeviceProtocolSettings protocolSettings,
     String configStatus,
     Instant configLastSentAt,

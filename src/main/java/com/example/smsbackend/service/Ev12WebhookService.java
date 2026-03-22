@@ -1,10 +1,7 @@
 package com.example.smsbackend.service;
 
 import com.example.smsbackend.config.WebhookProperties;
-import com.example.smsbackend.dto.AlarmUpdateEventResponse;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
-import com.example.smsbackend.entity.Device;
-import com.example.smsbackend.repository.DeviceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,21 +30,18 @@ public class Ev12WebhookService {
 
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
-    private final DeviceRepository deviceRepository;
-    private final AlarmStreamService alarmStreamService;
+    private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
     private final AtomicLong eventIdSequence = new AtomicLong(1);
     private final Deque<Ev12WebhookEventResponse> recentEvents = new ArrayDeque<>();
 
     public Ev12WebhookService(
         WebhookProperties webhookProperties,
         ObjectMapper objectMapper,
-        DeviceRepository deviceRepository,
-        AlarmStreamService alarmStreamService
+        AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
-        this.deviceRepository = deviceRepository;
-        this.alarmStreamService = alarmStreamService;
+        this.alarmCodeUpdateWorkerService = alarmCodeUpdateWorkerService;
     }
 
     @Transactional
@@ -114,23 +108,9 @@ public class Ev12WebhookService {
                 return;
             }
 
-            Device device = deviceRepository.findByExternalDeviceId(externalDeviceId.trim())
-                .orElse(null);
-            if (device == null) {
-                return;
-            }
-
-            String previousAlarmCode = device.getAlarmCode();
-            if (sameAlarmCode(previousAlarmCode, nextAlarmCode)) {
-                return;
-            }
-
-            device.setAlarmCode(nextAlarmCode);
-            Device savedDevice = deviceRepository.save(device);
-            alarmStreamService.publish(new AlarmUpdateEventResponse(
-                savedDevice.getId(),
-                savedDevice.getExternalDeviceId(),
-                savedDevice.getAlarmCode(),
+            alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
+                externalDeviceId.trim(),
+                nextAlarmCode,
                 Instant.now()
             ));
         } catch (Exception ignored) {
@@ -158,16 +138,6 @@ public class Ev12WebhookService {
             }
         }
         return false;
-    }
-
-    private boolean sameAlarmCode(String currentAlarmCode, String nextAlarmCode) {
-        if (currentAlarmCode == null && nextAlarmCode == null) {
-            return true;
-        }
-        if (currentAlarmCode == null || nextAlarmCode == null) {
-            return false;
-        }
-        return currentAlarmCode.equalsIgnoreCase(nextAlarmCode);
     }
 
     private String serializePayload(byte[] rawPayload, String contentType, Map<String, String> rawHeaders) {

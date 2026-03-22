@@ -5,6 +5,7 @@ import com.example.smsbackend.dto.Ev12WebhookEventResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -93,12 +94,12 @@ public class Ev12WebhookService {
 
         try {
             JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
-            String externalDeviceId = root.path("deviceId").asText(null);
+            String externalDeviceId = extractExternalDeviceId(root);
             if (!StringUtils.hasText(externalDeviceId)) {
                 return;
             }
 
-            JsonNode alarmCodeNode = root.path("data").path("Alarm Code");
+            JsonNode alarmCodeNode = extractAlarmCodeNode(root);
             if (!alarmCodeNode.isArray()) {
                 return;
             }
@@ -116,6 +117,45 @@ public class Ev12WebhookService {
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
         }
+    }
+
+    private String extractExternalDeviceId(JsonNode root) {
+        if (root == null || root.isMissingNode()) {
+            return null;
+        }
+
+        String direct = root.path("deviceId").asText(null);
+        if (StringUtils.hasText(direct)) {
+            return direct;
+        }
+
+        String nested = root.path("device").path("deviceId").asText(null);
+        if (StringUtils.hasText(nested)) {
+            return nested;
+        }
+
+        return root.path("IMEI").asText(null);
+    }
+
+    private JsonNode extractAlarmCodeNode(JsonNode root) {
+        JsonNode topLevel = root.path("Alarm Code");
+        if (topLevel.isArray()) {
+            return topLevel;
+        }
+
+        JsonNode data = root.path("data");
+        JsonNode nested = data.path("Alarm Code");
+        if (nested.isArray()) {
+            return nested;
+        }
+
+        JsonNode upperCaseData = root.path("Data");
+        JsonNode upperCaseNested = upperCaseData.path("Alarm Code");
+        if (upperCaseNested.isArray()) {
+            return upperCaseNested;
+        }
+
+        return JsonNodeFactory.instance.missingNode();
     }
 
     private String deriveAlarmCode(JsonNode alarmCodeNode) {

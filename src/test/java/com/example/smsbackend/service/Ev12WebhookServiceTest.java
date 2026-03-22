@@ -163,4 +163,34 @@ class Ev12WebhookServiceTest {
             "862667084205114".equals(request.externalDeviceId()) && "Fall-Down Alert".equals(request.alarmCode())
         ));
     }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeWhenAlarmCodeIsTopLevel() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"Alarm Code\":[\"SOS Alert\"]}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeWhenDataHasUpperCaseKey() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"Data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
 }

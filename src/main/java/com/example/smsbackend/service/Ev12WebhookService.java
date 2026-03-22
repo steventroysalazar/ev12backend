@@ -1,6 +1,7 @@
 package com.example.smsbackend.service;
 
 import com.example.smsbackend.config.WebhookProperties;
+import com.example.smsbackend.dto.AlarmUpdateEventResponse;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.DeviceRepository;
@@ -33,17 +34,20 @@ public class Ev12WebhookService {
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final DeviceRepository deviceRepository;
+    private final AlarmStreamService alarmStreamService;
     private final AtomicLong eventIdSequence = new AtomicLong(1);
     private final Deque<Ev12WebhookEventResponse> recentEvents = new ArrayDeque<>();
 
     public Ev12WebhookService(
         WebhookProperties webhookProperties,
         ObjectMapper objectMapper,
-        DeviceRepository deviceRepository
+        DeviceRepository deviceRepository,
+        AlarmStreamService alarmStreamService
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
         this.deviceRepository = deviceRepository;
+        this.alarmStreamService = alarmStreamService;
     }
 
     @Transactional
@@ -116,8 +120,19 @@ public class Ev12WebhookService {
                 return;
             }
 
+            String previousAlarmCode = device.getAlarmCode();
+            if (sameAlarmCode(previousAlarmCode, nextAlarmCode)) {
+                return;
+            }
+
             device.setAlarmCode(nextAlarmCode);
-            deviceRepository.save(device);
+            Device savedDevice = deviceRepository.save(device);
+            alarmStreamService.publish(new AlarmUpdateEventResponse(
+                savedDevice.getId(),
+                savedDevice.getExternalDeviceId(),
+                savedDevice.getAlarmCode(),
+                Instant.now()
+            ));
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
         }
@@ -143,6 +158,16 @@ public class Ev12WebhookService {
             }
         }
         return false;
+    }
+
+    private boolean sameAlarmCode(String currentAlarmCode, String nextAlarmCode) {
+        if (currentAlarmCode == null && nextAlarmCode == null) {
+            return true;
+        }
+        if (currentAlarmCode == null || nextAlarmCode == null) {
+            return false;
+        }
+        return currentAlarmCode.equalsIgnoreCase(nextAlarmCode);
     }
 
     private String serializePayload(byte[] rawPayload, String contentType, Map<String, String> rawHeaders) {

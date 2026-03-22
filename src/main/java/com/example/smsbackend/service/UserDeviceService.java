@@ -219,6 +219,13 @@ public class UserDeviceService {
     }
 
     @Transactional(readOnly = true)
+    public DeviceResponse getDeviceById(Long deviceId) {
+        Device device = deviceRepository.findById(deviceId)
+            .orElseThrow(() -> new IllegalArgumentException("Device not found."));
+        return toDeviceResponse(device);
+    }
+
+    @Transactional(readOnly = true)
     public Device getDevice(Long deviceId) {
         return deviceRepository.findById(deviceId)
             .orElseThrow(() -> new IllegalArgumentException("Device not found."));

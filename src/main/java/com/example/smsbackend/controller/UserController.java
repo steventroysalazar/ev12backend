@@ -82,6 +82,11 @@ public class UserController {
         return ResponseEntity.ok(userDeviceService.updateDevice(deviceId, request));
     }
 
+    @GetMapping("/devices/{deviceId}")
+    public ResponseEntity<DeviceResponse> getDevice(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.getDeviceById(deviceId));
+    }
+
     @GetMapping("/devices")
     public ResponseEntity<List<DeviceResponse>> listDevices() {
         return ResponseEntity.ok(userDeviceService.listAllDevices());

@@ -6,6 +6,7 @@ import com.example.smsbackend.repository.DeviceRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -68,9 +69,9 @@ public class AlarmCodeUpdateWorkerService {
     }
 
     void process(AlarmCodeUpdateRequest request) {
-        Device device = deviceRepository.findByExternalDeviceId(request.externalDeviceId())
-            .orElse(null);
+        Device device = resolveDevice(request.externalDeviceId());
         if (device == null) {
+            LOGGER.warn("No device found for EV12 deviceId '{}' while applying alarm code '{}'", request.externalDeviceId(), request.alarmCode());
             return;
         }
         if (sameAlarmCode(device.getAlarmCode(), request.alarmCode())) {
@@ -86,6 +87,35 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getAlarmCode(),
             updatedAt
         ));
+    }
+
+    private Device resolveDevice(String externalDeviceId) {
+        Device exact = deviceRepository.findByExternalDeviceId(externalDeviceId).orElse(null);
+        if (exact != null) {
+            return exact;
+        }
+
+        String normalizedIncomingId = normalizeDeviceId(externalDeviceId);
+        if (!StringUtils.hasText(normalizedIncomingId)) {
+            return null;
+        }
+
+        List<Device> matches = deviceRepository.findAll().stream()
+            .filter(device -> normalizedIncomingId.equals(normalizeDeviceId(device.getExternalDeviceId())))
+            .limit(2)
+            .toList();
+
+        if (matches.size() == 1) {
+            return matches.get(0);
+        }
+        return null;
+    }
+
+    private String normalizeDeviceId(String deviceId) {
+        if (!StringUtils.hasText(deviceId)) {
+            return null;
+        }
+        return deviceId.replaceAll("[^A-Za-z0-9]", "").toLowerCase();
     }
 
     private boolean sameAlarmCode(String currentAlarmCode, String nextAlarmCode) {

@@ -30,11 +30,14 @@ class Ev12WebhookServiceTest {
     @Mock
     private DeviceRepository deviceRepository;
 
+    @Mock
+    private AlarmStreamService alarmStreamService;
+
     @Test
     void ingestShouldStoreRawPayload() throws Exception {
         byte[] rawPayload = "{\"Configuration Command\":{\"IMEI\":\"862667084205114\"}}".getBytes();
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
         Ev12WebhookEventResponse response = service.ingest(
             rawPayload,
             "application/json",
@@ -52,7 +55,7 @@ class Ev12WebhookServiceTest {
     void ingestShouldBase64EncodeBinaryPayload() throws Exception {
         byte[] rawPayload = new byte[]{0x01, 0x02, 0x03};
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
         Ev12WebhookEventResponse response = service.ingest(rawPayload, "application/octet-stream", null, Map.of());
 
         JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
@@ -61,14 +64,14 @@ class Ev12WebhookServiceTest {
 
     @Test
     void ingestShouldRequireValidTokenWhenConfigured() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, deviceRepository, alarmStreamService);
 
         assertThrows(ResponseStatusException.class, () -> service.ingest("{}".getBytes(), "application/json", "wrong", Map.of()));
     }
 
     @Test
     void ingestShouldAcceptEmptyPayload() throws Exception {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
 
         Ev12WebhookEventResponse response = service.ingest(new byte[0], "application/octet-stream", null, Map.of());
 
@@ -78,7 +81,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void recentEventsShouldApplyRequestedLimitWithoutHardCap() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
 
         service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
         service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
@@ -92,7 +95,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void recentEventsShouldReturnAllEventsWithoutCap() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
 
         service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
         service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
@@ -106,7 +109,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void clearEventsShouldRemoveAllStoredEvents() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
 
         service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
         service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
@@ -119,7 +122,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void clearEventsShouldRequireTokenWhenConfigured() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, deviceRepository, alarmStreamService);
 
         assertThrows(ResponseStatusException.class, () -> service.clearEvents("wrong"));
     }
@@ -130,7 +133,7 @@ class Ev12WebhookServiceTest {
         when(deviceRepository.findByExternalDeviceId("862667084205114")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
             "application/json",
@@ -149,7 +152,7 @@ class Ev12WebhookServiceTest {
         when(deviceRepository.findByExternalDeviceId("862667084205114")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}".getBytes(),
             "application/json",
@@ -167,7 +170,7 @@ class Ev12WebhookServiceTest {
         when(deviceRepository.findByExternalDeviceId("862667084205114")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository);
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, deviceRepository, alarmStreamService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Fall-Down Alert\"]}}".getBytes(),
             "application/json",

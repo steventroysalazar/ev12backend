@@ -135,7 +135,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void ingestShouldClearDeviceAlarmCodeForSosEnding() {
+    void ingestShouldNormalizeSosEndingToSosAlert() {
         Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}".getBytes(),
@@ -145,7 +145,7 @@ class Ev12WebhookServiceTest {
         );
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && request.alarmCode() == null
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
         ));
     }
 
@@ -176,6 +176,24 @@ class Ev12WebhookServiceTest {
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
             "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeWhenAlarmCodeIsStringAndUsePayloadTimestamp() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"timestamp\":1774215008810,\"data\":{\"alarmCode\":\"SOS ending\"}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId())
+                && "SOS Alert".equals(request.alarmCode())
+                && request.updatedAt() != null
+                && request.updatedAt().toEpochMilli() == 1774215008810L
         ));
     }
 

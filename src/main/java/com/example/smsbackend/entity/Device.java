@@ -32,6 +32,9 @@ public class Device {
     @Column(name = "alarm_code", length = 64)
     private String alarmCode;
 
+    @Column(name = "alarm_cancelled_at")
+    private Instant alarmCancelledAt;
+
     @Lob
     @Column(name = "protocol_config")
     private String protocolConfig;
@@ -87,6 +90,14 @@ public class Device {
 
     public void setAlarmCode(String alarmCode) {
         this.alarmCode = alarmCode;
+    }
+
+    public Instant getAlarmCancelledAt() {
+        return alarmCancelledAt;
+    }
+
+    public void setAlarmCancelledAt(Instant alarmCancelledAt) {
+        this.alarmCancelledAt = alarmCancelledAt;
     }
 
     public AppUser getUser() {

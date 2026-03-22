@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
 public class AlarmCodeUpdateWorkerService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AlarmCodeUpdateWorkerService.class);
+    private static final String SOS_ALERT = "SOS Alert";
 
     private final DeviceRepository deviceRepository;
     private final AlarmStreamService alarmStreamService;
@@ -74,6 +75,10 @@ public class AlarmCodeUpdateWorkerService {
             LOGGER.warn("No device found for EV12 deviceId '{}' while applying alarm code '{}'", request.externalDeviceId(), request.alarmCode());
             return;
         }
+        if (isStaleSosUpdate(device, request)) {
+            return;
+        }
+
         if (sameAlarmCode(device.getAlarmCode(), request.alarmCode())) {
             return;
         }
@@ -87,6 +92,18 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getAlarmCode(),
             updatedAt
         ));
+    }
+
+    private boolean isStaleSosUpdate(Device device, AlarmCodeUpdateRequest request) {
+        if (!SOS_ALERT.equalsIgnoreCase(String.valueOf(request.alarmCode()))) {
+            return false;
+        }
+        if (device.getAlarmCancelledAt() == null) {
+            return false;
+        }
+
+        Instant eventTime = request.updatedAt() == null ? Instant.now() : request.updatedAt();
+        return !eventTime.isAfter(device.getAlarmCancelledAt());
     }
 
     private Device resolveDevice(String externalDeviceId) {

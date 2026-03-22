@@ -8,12 +8,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.http.HttpStatus;
@@ -26,7 +28,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class Ev12WebhookService {
 
     private static final String SOS_ALERT = "SOS Alert";
-    private static final String SOS_ENDING = "SOS Ending";
     private static final String FALL_DOWN_ALERT = "Fall-Down Alert";
 
     private final WebhookProperties webhookProperties;
@@ -100,19 +101,19 @@ public class Ev12WebhookService {
             }
 
             JsonNode alarmCodeNode = extractAlarmCodeNode(root);
-            if (!alarmCodeNode.isArray()) {
+            if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
                 return;
             }
 
             String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
-            if (nextAlarmCode == null && !containsCode(alarmCodeNode, SOS_ENDING)) {
+            if (nextAlarmCode == null) {
                 return;
             }
 
             alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
                 externalDeviceId.trim(),
                 nextAlarmCode,
-                Instant.now()
+                extractEventTimestamp(root)
             ));
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
@@ -138,31 +139,34 @@ public class Ev12WebhookService {
     }
 
     private JsonNode extractAlarmCodeNode(JsonNode root) {
-        JsonNode topLevel = root.path("Alarm Code");
-        if (topLevel.isArray()) {
+        JsonNode topLevel = firstPresentNode(root, "Alarm Code", "alarmCode", "alarm_code");
+        if (!topLevel.isMissingNode() && !topLevel.isNull()) {
             return topLevel;
         }
 
-        JsonNode data = root.path("data");
-        JsonNode nested = data.path("Alarm Code");
-        if (nested.isArray()) {
-            return nested;
-        }
-
-        JsonNode upperCaseData = root.path("Data");
-        JsonNode upperCaseNested = upperCaseData.path("Alarm Code");
-        if (upperCaseNested.isArray()) {
-            return upperCaseNested;
+        JsonNode data = firstPresentNode(root, "data", "Data");
+        if (!data.isMissingNode() && !data.isNull()) {
+            JsonNode nested = firstPresentNode(data, "Alarm Code", "alarmCode", "alarm_code");
+            if (!nested.isMissingNode() && !nested.isNull()) {
+                return nested;
+            }
         }
 
         return JsonNodeFactory.instance.missingNode();
     }
 
-    private String deriveAlarmCode(JsonNode alarmCodeNode) {
-        if (containsCode(alarmCodeNode, SOS_ENDING)) {
-            return null;
+    private JsonNode firstPresentNode(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            JsonNode candidate = node.path(fieldName);
+            if (!candidate.isMissingNode()) {
+                return candidate;
+            }
         }
-        if (containsCode(alarmCodeNode, SOS_ALERT)) {
+        return JsonNodeFactory.instance.missingNode();
+    }
+
+    private String deriveAlarmCode(JsonNode alarmCodeNode) {
+        if (containsSosCode(alarmCodeNode)) {
             return SOS_ALERT;
         }
         if (containsCode(alarmCodeNode, FALL_DOWN_ALERT)) {
@@ -171,13 +175,85 @@ public class Ev12WebhookService {
         return null;
     }
 
+    private boolean containsSosCode(JsonNode alarmCodeNode) {
+        if (alarmCodeNode.isArray()) {
+            for (JsonNode item : alarmCodeNode) {
+                if (isSosLike(item.asText())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return isSosLike(alarmCodeNode.asText());
+    }
+
+    private boolean isSosLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains("sos");
+    }
+
     private boolean containsCode(JsonNode alarmCodeNode, String code) {
-        for (JsonNode item : alarmCodeNode) {
-            if (code.equalsIgnoreCase(item.asText())) {
-                return true;
+        if (alarmCodeNode.isArray()) {
+            for (JsonNode item : alarmCodeNode) {
+                if (code.equalsIgnoreCase(item.asText())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return code.equalsIgnoreCase(alarmCodeNode.asText());
+    }
+
+    private Instant extractEventTimestamp(JsonNode root) {
+        Instant direct = parseTimestamp(root.path("timestamp"));
+        if (direct != null) {
+            return direct;
+        }
+
+        Instant eventTime = parseTimestamp(root.path("eventTime"));
+        if (eventTime != null) {
+            return eventTime;
+        }
+
+        Instant nested = parseTimestamp(root.path("data").path("timestamp"));
+        if (nested != null) {
+            return nested;
+        }
+
+        return Instant.now();
+    }
+
+    private Instant parseTimestamp(JsonNode timestampNode) {
+        if (timestampNode == null || timestampNode.isMissingNode() || timestampNode.isNull()) {
+            return null;
+        }
+
+        if (timestampNode.isNumber()) {
+            long raw = timestampNode.asLong();
+            return raw >= 1_000_000_000_000L ? Instant.ofEpochMilli(raw) : Instant.ofEpochSecond(raw);
+        }
+
+        if (timestampNode.isTextual()) {
+            String text = timestampNode.asText();
+            if (!StringUtils.hasText(text)) {
+                return null;
+            }
+            try {
+                return Instant.parse(text.trim());
+            } catch (DateTimeParseException ignored) {
+                try {
+                    long raw = Long.parseLong(text.trim());
+                    return raw >= 1_000_000_000_000L ? Instant.ofEpochMilli(raw) : Instant.ofEpochSecond(raw);
+                } catch (NumberFormatException ignoredNumber) {
+                    return null;
+                }
             }
         }
-        return false;
+
+        return null;
     }
 
     private String serializePayload(byte[] rawPayload, String contentType, Map<String, String> rawHeaders) {

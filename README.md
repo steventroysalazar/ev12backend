@@ -215,6 +215,84 @@ List devices for all users under a location.
 
 ---
 
+
+## Live alarm stream (frontend "always listening")
+
+Use this when you want the frontend to keep receiving alarm changes globally (not tied to one screen).
+
+### `GET /api/alarms/stream`
+Server-Sent Events (SSE) endpoint for real-time alarm updates.
+
+**Response content type**
+- `text/event-stream`
+
+**Events emitted**
+- `connected`: sent once when stream is connected
+- `alarm-update`: sent whenever a device alarm code changes
+
+**`alarm-update` payload**
+```json
+{
+  "deviceId": 12,
+  "externalDeviceId": "862667084205114",
+  "alarmCode": "SOS Alert",
+  "updatedAt": "2026-03-22T09:10:11.000Z"
+}
+```
+
+**Alarm code behavior**
+- `SOS Alert` => active SOS
+- `Fall-Down Alert` => active fall detection
+- `null` => alarm cleared (for example after `SOS Ending` webhook)
+
+### Frontend integration pattern (global listener)
+Create the stream once at app root (e.g. App provider / layout), then update global state/store so every page gets live changes.
+
+```ts
+// alarmStream.ts
+export function startAlarmStream(onAlarmUpdate: (update: {
+  deviceId: number;
+  externalDeviceId: string;
+  alarmCode: string | null;
+  updatedAt: string;
+}) => void) {
+  const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+  const source = new EventSource(`${baseUrl}/api/alarms/stream`);
+
+  source.addEventListener("alarm-update", (event) => {
+    const data = JSON.parse((event as MessageEvent).data);
+    onAlarmUpdate(data);
+  });
+
+  // Optional: useful for debugging connection lifecycle
+  source.addEventListener("connected", () => {
+    console.log("Alarm stream connected");
+  });
+
+  source.onerror = () => {
+    // Browser EventSource automatically retries connection
+    console.warn("Alarm stream disconnected. Retrying...");
+  };
+
+  return () => source.close();
+}
+```
+
+```ts
+// Example usage in app bootstrap (React)
+// Call this once so app keeps listening even when routes/pages change
+const stop = startAlarmStream((update) => {
+  // Update your global store by deviceId
+  // e.g. setDeviceAlarm(update.deviceId, update.alarmCode)
+});
+
+// on app cleanup/logout:
+// stop();
+```
+
+> Recommended UX: show a persistent alarm badge/toast and a global sound/vibration trigger based on `alarm-update`, not per-page polling.
+
+---
 ## Location APIs
 
 ### `POST /api/locations`

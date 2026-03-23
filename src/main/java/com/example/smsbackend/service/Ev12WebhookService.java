@@ -27,9 +27,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Ev12WebhookService {
 
-    private static final String SOS_ALERT = "SOS Alert";
-    private static final String FALL_DOWN_ALERT = "Fall-Down Alert";
-
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
@@ -116,7 +113,6 @@ public class Ev12WebhookService {
                     nextAlarmCode,
                     extractEventTimestamp(candidatePayload)
                 ));
-                return;
             }
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
@@ -129,9 +125,28 @@ public class Ev12WebhookService {
             return candidates;
         }
 
-        candidates.add(root);
-        collectResponseCandidates(root, candidates);
+        appendCandidatePayload(root, candidates);
         return candidates;
+    }
+
+    private void appendCandidatePayload(JsonNode node, List<JsonNode> candidates) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                appendCandidatePayload(item, candidates);
+            }
+            return;
+        }
+
+        if (!node.isObject()) {
+            return;
+        }
+
+        candidates.add(node);
+        collectResponseCandidates(node, candidates);
     }
 
     private void collectResponseCandidates(JsonNode node, List<JsonNode> candidates) {
@@ -154,15 +169,22 @@ public class Ev12WebhookService {
     }
 
     private void addCandidateNode(JsonNode candidateNode, List<JsonNode> candidates) {
+        if (candidateNode.isArray()) {
+            for (JsonNode item : candidateNode) {
+                addCandidateNode(item, candidates);
+            }
+            return;
+        }
+
         if (candidateNode.isObject()) {
-            candidates.add(candidateNode);
+            appendCandidatePayload(candidateNode, candidates);
             return;
         }
 
         if (candidateNode.isTextual()) {
             JsonNode parsed = parseJson(candidateNode.asText());
-            if (parsed != null && parsed.isObject()) {
-                candidates.add(parsed);
+            if (parsed != null) {
+                addCandidateNode(parsed, candidates);
             }
         }
     }
@@ -228,26 +250,44 @@ public class Ev12WebhookService {
     }
 
     private String deriveAlarmCode(JsonNode alarmCodeNode) {
-        if (containsSosCode(alarmCodeNode)) {
-            return SOS_ALERT;
+        String latestMatch = null;
+        for (String alarmCodeValue : alarmCodeValues(alarmCodeNode)) {
+            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue)) {
+                latestMatch = alarmCodeValue;
+            }
         }
-        if (containsCode(alarmCodeNode, FALL_DOWN_ALERT)) {
-            return FALL_DOWN_ALERT;
-        }
-        return null;
+        return latestMatch;
     }
 
-    private boolean containsSosCode(JsonNode alarmCodeNode) {
-        if (alarmCodeNode.isArray()) {
-            for (JsonNode item : alarmCodeNode) {
-                if (isSosLike(item.asText())) {
-                    return true;
-                }
-            }
-            return false;
+    private List<String> alarmCodeValues(JsonNode alarmCodeNode) {
+        List<String> values = new ArrayList<>();
+        if (alarmCodeNode == null || alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+            return values;
         }
 
-        return isSosLike(alarmCodeNode.asText());
+        if (alarmCodeNode.isArray()) {
+            for (JsonNode item : alarmCodeNode) {
+                String value = normalizeAlarmCodeValue(item.asText(null));
+                if (value != null) {
+                    values.add(value);
+                }
+            }
+            return values;
+        }
+
+        String singleValue = normalizeAlarmCodeValue(alarmCodeNode.asText(null));
+        if (singleValue != null) {
+            values.add(singleValue);
+        }
+        return values;
+    }
+
+    private String normalizeAlarmCodeValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private boolean isSosLike(String value) {
@@ -257,16 +297,11 @@ public class Ev12WebhookService {
         return value.toLowerCase(Locale.ROOT).contains("sos");
     }
 
-    private boolean containsCode(JsonNode alarmCodeNode, String code) {
-        if (alarmCodeNode.isArray()) {
-            for (JsonNode item : alarmCodeNode) {
-                if (code.equalsIgnoreCase(item.asText())) {
-                    return true;
-                }
-            }
+    private boolean isFallLike(String value) {
+        if (!StringUtils.hasText(value)) {
             return false;
         }
-        return code.equalsIgnoreCase(alarmCodeNode.asText());
+        return value.toLowerCase(Locale.ROOT).contains("fall");
     }
 
     private Instant extractEventTimestamp(JsonNode root) {

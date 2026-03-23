@@ -50,9 +50,16 @@ public class AlarmCodeUpdateWorkerService {
 
     public void enqueue(AlarmCodeUpdateRequest request) {
         if (request == null || !StringUtils.hasText(request.externalDeviceId())) {
+            LOGGER.warn("Skipping alarm update enqueue because request or externalDeviceId is missing.");
             return;
         }
         queue.offer(request);
+        LOGGER.info(
+            "Alarm update enqueued: externalDeviceId='{}', alarmCode='{}', eventTimestamp='{}'",
+            request.externalDeviceId(),
+            request.alarmCode(),
+            request.updatedAt()
+        );
     }
 
     void runLoop() {
@@ -76,15 +83,33 @@ public class AlarmCodeUpdateWorkerService {
             return;
         }
         if (isStaleSosUpdate(device, request)) {
+            LOGGER.info(
+                "Ignoring stale SOS update for device '{}'. requestTimestamp='{}', cancelledAt='{}'",
+                device.getExternalDeviceId(),
+                request.updatedAt(),
+                device.getAlarmCancelledAt()
+            );
             return;
         }
 
         if (sameAlarmCode(device.getAlarmCode(), request.alarmCode())) {
+            LOGGER.info(
+                "Ignoring unchanged alarm code for device '{}'. current='{}', incoming='{}'",
+                device.getExternalDeviceId(),
+                device.getAlarmCode(),
+                request.alarmCode()
+            );
             return;
         }
 
         device.setAlarmCode(request.alarmCode());
         Device savedDevice = deviceRepository.save(device);
+        LOGGER.info(
+            "Alarm code updated: deviceId='{}', externalDeviceId='{}', alarmCode='{}'",
+            savedDevice.getId(),
+            savedDevice.getExternalDeviceId(),
+            savedDevice.getAlarmCode()
+        );
         Instant updatedAt = request.updatedAt() == null ? Instant.now() : request.updatedAt();
         alarmStreamService.publish(new AlarmUpdateEventResponse(
             savedDevice.getId(),

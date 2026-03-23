@@ -1,6 +1,7 @@
 package com.example.smsbackend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
@@ -42,6 +43,7 @@ class Ev12WebhookServiceTest {
         assertEquals(new String(rawPayload), payloadJson.get("rawBody").asText());
         assertEquals("application/json", payloadJson.get("contentType").asText());
         assertEquals("header-value", payloadJson.get("rawHeaders").get("X-Test").asText());
+        assertFalse(response.alarmAttempts().isEmpty());
     }
 
     @Test
@@ -70,6 +72,25 @@ class Ev12WebhookServiceTest {
 
         JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
         assertEquals("", payloadJson.get("rawBody").asText());
+        assertEquals("ignored", response.alarmAttempts().get(0).action());
+        assertEquals("empty payload", response.alarmAttempts().get(0).reason());
+    }
+
+    @Test
+    void ingestShouldExposeAlarmAttemptDebugDataWhenUpdateIsQueued() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+
+        Ev12WebhookEventResponse response = service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        assertEquals(1, response.alarmAttempts().size());
+        assertEquals("queued", response.alarmAttempts().get(0).action());
+        assertEquals("862667084205114", response.alarmAttempts().get(0).externalDeviceId());
+        assertEquals("SOS Alert", response.alarmAttempts().get(0).alarmCode());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.example.smsbackend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.smsbackend.config.WebhookProperties;
@@ -135,7 +136,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void ingestShouldNormalizeSosEndingToSosAlert() {
+    void ingestShouldUseLatestMatchingAlarmCodeValueFromPayload() {
         Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}".getBytes(),
@@ -145,7 +146,7 @@ class Ev12WebhookServiceTest {
         );
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Ending".equals(request.alarmCode())
         ));
     }
 
@@ -191,7 +192,7 @@ class Ev12WebhookServiceTest {
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
             "862667084205114".equals(request.externalDeviceId())
-                && "SOS Alert".equals(request.alarmCode())
+                && "SOS ending".equals(request.alarmCode())
                 && request.updatedAt() != null
                 && request.updatedAt().toEpochMilli() == 1774215008810L
         ));
@@ -209,6 +210,72 @@ class Ev12WebhookServiceTest {
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
             "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeWhenWebhookContainsResponseObject() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"response\":{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeWhenWebhookContainsSerializedResponsePayload() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            ("{\"data\":{\"response\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}}")
+                .getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeForAnyFallContainingValue() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Fall trigger level 2\"]}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "Fall trigger level 2".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldProcessAllAlarmEntriesWhenPayloadContainsMultipleWebhookEvents() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            ("[" +
+                "{\"deviceId\":\"862667084205114\",\"timestamp\":1774296609413,\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}," +
+                "{\"deviceId\":\"862667084205114\",\"timestamp\":1774297800000,\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}" +
+            "]")
+                .getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService, times(2)).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId())
+                && ("SOS Alert".equals(request.alarmCode()) || "SOS Ending".equals(request.alarmCode()))
         ));
     }
 }

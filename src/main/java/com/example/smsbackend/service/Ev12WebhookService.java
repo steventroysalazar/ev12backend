@@ -27,9 +27,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Ev12WebhookService {
 
-    private static final String SOS_ALERT = "SOS Alert";
-    private static final String FALL_DOWN_ALERT = "Fall-Down Alert";
-
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
@@ -95,28 +92,111 @@ public class Ev12WebhookService {
 
         try {
             JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
-            String externalDeviceId = extractExternalDeviceId(root);
-            if (!StringUtils.hasText(externalDeviceId)) {
-                return;
-            }
+            for (JsonNode candidatePayload : candidatePayloads(root)) {
+                String externalDeviceId = extractExternalDeviceId(candidatePayload);
+                if (!StringUtils.hasText(externalDeviceId)) {
+                    continue;
+                }
 
-            JsonNode alarmCodeNode = extractAlarmCodeNode(root);
-            if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
-                return;
-            }
+                JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
+                if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+                    continue;
+                }
 
-            String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
-            if (nextAlarmCode == null) {
-                return;
-            }
+                String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
+                if (nextAlarmCode == null) {
+                    continue;
+                }
 
-            alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
-                externalDeviceId.trim(),
-                nextAlarmCode,
-                extractEventTimestamp(root)
-            ));
+                alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
+                    externalDeviceId.trim(),
+                    nextAlarmCode,
+                    extractEventTimestamp(candidatePayload)
+                ));
+            }
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
+        }
+    }
+
+    private List<JsonNode> candidatePayloads(JsonNode root) {
+        List<JsonNode> candidates = new ArrayList<>();
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return candidates;
+        }
+
+        appendCandidatePayload(root, candidates);
+        return candidates;
+    }
+
+    private void appendCandidatePayload(JsonNode node, List<JsonNode> candidates) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                appendCandidatePayload(item, candidates);
+            }
+            return;
+        }
+
+        if (!node.isObject()) {
+            return;
+        }
+
+        candidates.add(node);
+        collectResponseCandidates(node, candidates);
+    }
+
+    private void collectResponseCandidates(JsonNode node, List<JsonNode> candidates) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+
+        JsonNode response = node.path("response");
+        if (!response.isMissingNode() && !response.isNull()) {
+            addCandidateNode(response, candidates);
+        }
+
+        JsonNode nestedData = firstPresentNode(node, "data", "Data");
+        if (!nestedData.isMissingNode() && !nestedData.isNull()) {
+            JsonNode nestedResponse = nestedData.path("response");
+            if (!nestedResponse.isMissingNode() && !nestedResponse.isNull()) {
+                addCandidateNode(nestedResponse, candidates);
+            }
+        }
+    }
+
+    private void addCandidateNode(JsonNode candidateNode, List<JsonNode> candidates) {
+        if (candidateNode.isArray()) {
+            for (JsonNode item : candidateNode) {
+                addCandidateNode(item, candidates);
+            }
+            return;
+        }
+
+        if (candidateNode.isObject()) {
+            appendCandidatePayload(candidateNode, candidates);
+            return;
+        }
+
+        if (candidateNode.isTextual()) {
+            JsonNode parsed = parseJson(candidateNode.asText());
+            if (parsed != null) {
+                addCandidateNode(parsed, candidates);
+            }
+        }
+    }
+
+    private JsonNode parseJson(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(value.trim());
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -156,6 +236,10 @@ public class Ev12WebhookService {
     }
 
     private JsonNode firstPresentNode(JsonNode node, String... fieldNames) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return JsonNodeFactory.instance.missingNode();
+        }
+
         for (String fieldName : fieldNames) {
             JsonNode candidate = node.path(fieldName);
             if (!candidate.isMissingNode()) {
@@ -166,26 +250,44 @@ public class Ev12WebhookService {
     }
 
     private String deriveAlarmCode(JsonNode alarmCodeNode) {
-        if (containsSosCode(alarmCodeNode)) {
-            return SOS_ALERT;
+        String latestMatch = null;
+        for (String alarmCodeValue : alarmCodeValues(alarmCodeNode)) {
+            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue)) {
+                latestMatch = alarmCodeValue;
+            }
         }
-        if (containsCode(alarmCodeNode, FALL_DOWN_ALERT)) {
-            return FALL_DOWN_ALERT;
-        }
-        return null;
+        return latestMatch;
     }
 
-    private boolean containsSosCode(JsonNode alarmCodeNode) {
-        if (alarmCodeNode.isArray()) {
-            for (JsonNode item : alarmCodeNode) {
-                if (isSosLike(item.asText())) {
-                    return true;
-                }
-            }
-            return false;
+    private List<String> alarmCodeValues(JsonNode alarmCodeNode) {
+        List<String> values = new ArrayList<>();
+        if (alarmCodeNode == null || alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+            return values;
         }
 
-        return isSosLike(alarmCodeNode.asText());
+        if (alarmCodeNode.isArray()) {
+            for (JsonNode item : alarmCodeNode) {
+                String value = normalizeAlarmCodeValue(item.asText(null));
+                if (value != null) {
+                    values.add(value);
+                }
+            }
+            return values;
+        }
+
+        String singleValue = normalizeAlarmCodeValue(alarmCodeNode.asText(null));
+        if (singleValue != null) {
+            values.add(singleValue);
+        }
+        return values;
+    }
+
+    private String normalizeAlarmCodeValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private boolean isSosLike(String value) {
@@ -195,16 +297,11 @@ public class Ev12WebhookService {
         return value.toLowerCase(Locale.ROOT).contains("sos");
     }
 
-    private boolean containsCode(JsonNode alarmCodeNode, String code) {
-        if (alarmCodeNode.isArray()) {
-            for (JsonNode item : alarmCodeNode) {
-                if (code.equalsIgnoreCase(item.asText())) {
-                    return true;
-                }
-            }
+    private boolean isFallLike(String value) {
+        if (!StringUtils.hasText(value)) {
             return false;
         }
-        return code.equalsIgnoreCase(alarmCodeNode.asText());
+        return value.toLowerCase(Locale.ROOT).contains("fall");
     }
 
     private Instant extractEventTimestamp(JsonNode root) {
@@ -221,6 +318,11 @@ public class Ev12WebhookService {
         Instant nested = parseTimestamp(root.path("data").path("timestamp"));
         if (nested != null) {
             return nested;
+        }
+
+        Instant createdAt = parseTimestamp(root.path("createdAt"));
+        if (createdAt != null) {
+            return createdAt;
         }
 
         return Instant.now();

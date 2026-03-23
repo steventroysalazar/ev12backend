@@ -39,6 +39,10 @@ public class Ev12WebhookEvent {
     @Column(nullable = false)
     private String payloadJson;
 
+    @Lob
+    @Column(nullable = false)
+    private String alarmAttemptsJson;
+
     public Long getId() {
         return id;
     }
@@ -97,5 +101,13 @@ public class Ev12WebhookEvent {
 
     public void setPayloadJson(String payloadJson) {
         this.payloadJson = payloadJson;
+    }
+
+    public String getAlarmAttemptsJson() {
+        return alarmAttemptsJson;
+    }
+
+    public void setAlarmAttemptsJson(String alarmAttemptsJson) {
+        this.alarmAttemptsJson = alarmAttemptsJson;
     }
 }

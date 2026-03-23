@@ -2,6 +2,10 @@ package com.example.smsbackend.service;
 
 import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
+import com.example.smsbackend.dto.WebhookAlarmAttemptResponse;
+import com.example.smsbackend.entity.Ev12WebhookEvent;
+import com.example.smsbackend.repository.Ev12WebhookEventRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,15 +13,16 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,20 +32,23 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Ev12WebhookService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Ev12WebhookService.class);
+
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
-    private final AtomicLong eventIdSequence = new AtomicLong(1);
-    private final Deque<Ev12WebhookEventResponse> recentEvents = new ArrayDeque<>();
+    private final Ev12WebhookEventRepository ev12WebhookEventRepository;
 
     public Ev12WebhookService(
         WebhookProperties webhookProperties,
         ObjectMapper objectMapper,
-        AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService
+        AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService,
+        Ev12WebhookEventRepository ev12WebhookEventRepository
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
         this.alarmCodeUpdateWorkerService = alarmCodeUpdateWorkerService;
+        this.ev12WebhookEventRepository = ev12WebhookEventRepository;
     }
 
     @Transactional
@@ -51,72 +59,178 @@ public class Ev12WebhookService {
         Map<String, String> rawHeaders
     ) {
         validateToken(providedToken);
-        updateDeviceAlarmCode(rawPayload);
+        List<WebhookAlarmAttemptResponse> alarmAttempts = updateDeviceAlarmCode(rawPayload);
 
-        Ev12WebhookEventResponse event = new Ev12WebhookEventResponse(
-            eventIdSequence.getAndIncrement(),
-            Instant.now(),
-            serializePayload(rawPayload, contentType, rawHeaders)
-        );
-
-        recentEvents.addFirst(event);
-        return event;
+        Instant receivedAt = Instant.now();
+        String payloadJson = serializePayload(rawPayload, contentType, rawHeaders);
+        String alarmAttemptsJson = serializeAlarmAttempts(alarmAttempts);
+        Ev12WebhookEvent saved = persistWebhookEvent(payloadJson, alarmAttemptsJson, alarmAttempts, receivedAt);
+        return toResponse(saved);
     }
 
     public synchronized List<Ev12WebhookEventResponse> recentEvents(Integer limit, String providedToken) {
         validateToken(providedToken);
-
-        List<Ev12WebhookEventResponse> events = new ArrayList<>(recentEvents);
-        if (limit == null) {
-            return events;
-        }
-
-        int normalizedLimit = Math.max(1, limit);
-        return events.stream()
-            .limit(normalizedLimit)
+        int normalizedLimit = limit == null ? 200 : Math.max(1, limit);
+        return ev12WebhookEventRepository.findAllByOrderByReceivedAtDesc(PageRequest.of(
+            0,
+            normalizedLimit,
+            Sort.by(Sort.Direction.DESC, "receivedAt")
+        ))
+            .stream()
+            .map(this::toResponse)
             .toList();
     }
 
     public synchronized int clearEvents(String providedToken) {
         validateToken(providedToken);
 
-        int deletedCount = recentEvents.size();
-        recentEvents.clear();
+        int deletedCount = Math.toIntExact(ev12WebhookEventRepository.count());
+        ev12WebhookEventRepository.deleteAll();
         return deletedCount;
     }
 
-    private void updateDeviceAlarmCode(byte[] rawPayload) {
+    private Ev12WebhookEvent persistWebhookEvent(
+        String payloadJson,
+        String alarmAttemptsJson,
+        List<WebhookAlarmAttemptResponse> alarmAttempts,
+        Instant receivedAt
+    ) {
+        Ev12WebhookEvent entity = new Ev12WebhookEvent();
+        entity.setReceivedAt(receivedAt);
+        entity.setPayloadJson(payloadJson);
+        entity.setAlarmAttemptsJson(alarmAttemptsJson);
+        WebhookAlarmAttemptResponse primary = alarmAttempts.stream().findFirst().orElse(null);
+        if (primary != null) {
+            entity.setDeviceId(primary.externalDeviceId());
+            entity.setImei(primary.externalDeviceId());
+            entity.setDeviceTimestamp(primary.eventTimestamp());
+        }
+        return ev12WebhookEventRepository.save(entity);
+    }
+
+    private String serializeAlarmAttempts(List<WebhookAlarmAttemptResponse> alarmAttempts) {
+        try {
+            return objectMapper.writeValueAsString(alarmAttempts == null ? List.of() : alarmAttempts);
+        } catch (JsonProcessingException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to serialize alarm attempts", exception);
+        }
+    }
+
+    private Ev12WebhookEventResponse toResponse(Ev12WebhookEvent event) {
+        return new Ev12WebhookEventResponse(
+            event.getId(),
+            event.getReceivedAt(),
+            event.getPayloadJson(),
+            deserializeAlarmAttempts(event.getAlarmAttemptsJson())
+        );
+    }
+
+    private List<WebhookAlarmAttemptResponse> deserializeAlarmAttempts(String alarmAttemptsJson) {
+        if (!StringUtils.hasText(alarmAttemptsJson)) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(alarmAttemptsJson, new TypeReference<List<WebhookAlarmAttemptResponse>>() {});
+        } catch (Exception exception) {
+            LOGGER.warn("Unable to deserialize stored alarm attempts JSON.", exception);
+            return List.of();
+        }
+    }
+
+    private List<WebhookAlarmAttemptResponse> updateDeviceAlarmCode(byte[] rawPayload) {
+        List<WebhookAlarmAttemptResponse> alarmAttempts = new ArrayList<>();
         if (rawPayload == null || rawPayload.length == 0) {
-            return;
+            alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                0,
+                null,
+                null,
+                null,
+                "ignored",
+                "empty payload"
+            ));
+            return alarmAttempts;
         }
 
         try {
             JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
+            int candidateIndex = 0;
             for (JsonNode candidatePayload : candidatePayloads(root)) {
                 String externalDeviceId = extractExternalDeviceId(candidatePayload);
                 if (!StringUtils.hasText(externalDeviceId)) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        null,
+                        null,
+                        null,
+                        "ignored",
+                        "missing deviceId"
+                    ));
                     continue;
                 }
 
                 JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
                 if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        externalDeviceId.trim(),
+                        null,
+                        null,
+                        "ignored",
+                        "missing alarm code"
+                    ));
                     continue;
                 }
 
                 String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
                 if (nextAlarmCode == null) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        externalDeviceId.trim(),
+                        null,
+                        null,
+                        "ignored",
+                        "alarm code does not contain sos/fall"
+                    ));
                     continue;
                 }
 
-                alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
+                Instant eventTimestamp = extractEventTimestamp(candidatePayload);
+                AlarmCodeUpdateResult updateResult = alarmCodeUpdateWorkerService.applyNow(new AlarmCodeUpdateRequest(
                     externalDeviceId.trim(),
                     nextAlarmCode,
-                    extractEventTimestamp(candidatePayload)
+                    eventTimestamp
                 ));
+                WebhookAlarmAttemptResponse attempt = new WebhookAlarmAttemptResponse(
+                    candidateIndex++,
+                    externalDeviceId.trim(),
+                    nextAlarmCode,
+                    eventTimestamp,
+                    updateResult.action(),
+                    updateResult.reason()
+                );
+                alarmAttempts.add(attempt);
+                LOGGER.info(
+                    "EV12 webhook alarm update result: deviceId='{}', alarmCode='{}', eventTimestamp='{}', action='{}', reason='{}'",
+                    attempt.externalDeviceId(),
+                    attempt.alarmCode(),
+                    attempt.eventTimestamp(),
+                    attempt.action(),
+                    attempt.reason()
+                );
             }
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
+            alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                0,
+                null,
+                null,
+                null,
+                "ignored",
+                "malformed or non-json payload"
+            ));
+            LOGGER.warn("EV12 webhook payload could not be parsed for alarm updates.");
         }
+        return alarmAttempts;
     }
 
     private List<JsonNode> candidatePayloads(JsonNode root) {

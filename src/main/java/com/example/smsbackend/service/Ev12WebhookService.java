@@ -95,28 +95,86 @@ public class Ev12WebhookService {
 
         try {
             JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
-            String externalDeviceId = extractExternalDeviceId(root);
-            if (!StringUtils.hasText(externalDeviceId)) {
+            for (JsonNode candidatePayload : candidatePayloads(root)) {
+                String externalDeviceId = extractExternalDeviceId(candidatePayload);
+                if (!StringUtils.hasText(externalDeviceId)) {
+                    continue;
+                }
+
+                JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
+                if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+                    continue;
+                }
+
+                String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
+                if (nextAlarmCode == null) {
+                    continue;
+                }
+
+                alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
+                    externalDeviceId.trim(),
+                    nextAlarmCode,
+                    extractEventTimestamp(candidatePayload)
+                ));
                 return;
             }
-
-            JsonNode alarmCodeNode = extractAlarmCodeNode(root);
-            if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
-                return;
-            }
-
-            String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
-            if (nextAlarmCode == null) {
-                return;
-            }
-
-            alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
-                externalDeviceId.trim(),
-                nextAlarmCode,
-                extractEventTimestamp(root)
-            ));
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
+        }
+    }
+
+    private List<JsonNode> candidatePayloads(JsonNode root) {
+        List<JsonNode> candidates = new ArrayList<>();
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return candidates;
+        }
+
+        candidates.add(root);
+        collectResponseCandidates(root, candidates);
+        return candidates;
+    }
+
+    private void collectResponseCandidates(JsonNode node, List<JsonNode> candidates) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+
+        JsonNode response = node.path("response");
+        if (!response.isMissingNode() && !response.isNull()) {
+            addCandidateNode(response, candidates);
+        }
+
+        JsonNode nestedData = firstPresentNode(node, "data", "Data");
+        if (!nestedData.isMissingNode() && !nestedData.isNull()) {
+            JsonNode nestedResponse = nestedData.path("response");
+            if (!nestedResponse.isMissingNode() && !nestedResponse.isNull()) {
+                addCandidateNode(nestedResponse, candidates);
+            }
+        }
+    }
+
+    private void addCandidateNode(JsonNode candidateNode, List<JsonNode> candidates) {
+        if (candidateNode.isObject()) {
+            candidates.add(candidateNode);
+            return;
+        }
+
+        if (candidateNode.isTextual()) {
+            JsonNode parsed = parseJson(candidateNode.asText());
+            if (parsed != null && parsed.isObject()) {
+                candidates.add(parsed);
+            }
+        }
+    }
+
+    private JsonNode parseJson(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(value.trim());
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -156,6 +214,10 @@ public class Ev12WebhookService {
     }
 
     private JsonNode firstPresentNode(JsonNode node, String... fieldNames) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return JsonNodeFactory.instance.missingNode();
+        }
+
         for (String fieldName : fieldNames) {
             JsonNode candidate = node.path(fieldName);
             if (!candidate.isMissingNode()) {
@@ -221,6 +283,11 @@ public class Ev12WebhookService {
         Instant nested = parseTimestamp(root.path("data").path("timestamp"));
         if (nested != null) {
             return nested;
+        }
+
+        Instant createdAt = parseTimestamp(root.path("createdAt"));
+        if (createdAt != null) {
+            return createdAt;
         }
 
         return Instant.now();

@@ -3,13 +3,9 @@ package com.example.smsbackend.service;
 import com.example.smsbackend.dto.AlarmUpdateEventResponse;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.DeviceRepository;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,64 +19,36 @@ public class AlarmCodeUpdateWorkerService {
 
     private final DeviceRepository deviceRepository;
     private final AlarmStreamService alarmStreamService;
-    private final BlockingQueue<AlarmCodeUpdateRequest> queue = new LinkedBlockingQueue<>();
-
-    private Thread workerThread;
-    private volatile boolean running = true;
 
     public AlarmCodeUpdateWorkerService(DeviceRepository deviceRepository, AlarmStreamService alarmStreamService) {
         this.deviceRepository = deviceRepository;
         this.alarmStreamService = alarmStreamService;
     }
 
-    @PostConstruct
-    void start() {
-        workerThread = new Thread(this::runLoop, "alarm-code-update-worker");
-        workerThread.setDaemon(true);
-        workerThread.start();
-    }
-
-    @PreDestroy
-    void stop() {
-        running = false;
-        if (workerThread != null) {
-            workerThread.interrupt();
-        }
-    }
-
-    public void enqueue(AlarmCodeUpdateRequest request) {
+    public AlarmCodeUpdateResult applyNow(AlarmCodeUpdateRequest request) {
         if (request == null || !StringUtils.hasText(request.externalDeviceId())) {
             LOGGER.warn("Skipping alarm update enqueue because request or externalDeviceId is missing.");
-            return;
+            return AlarmCodeUpdateResult.ignored("missing externalDeviceId");
         }
-        queue.offer(request);
         LOGGER.info(
-            "Alarm update enqueued: externalDeviceId='{}', alarmCode='{}', eventTimestamp='{}'",
+            "Applying alarm update: externalDeviceId='{}', alarmCode='{}', eventTimestamp='{}'",
             request.externalDeviceId(),
             request.alarmCode(),
             request.updatedAt()
         );
-    }
-
-    void runLoop() {
-        while (running) {
-            try {
-                AlarmCodeUpdateRequest request = queue.take();
-                process(request);
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                return;
-            } catch (Exception exception) {
-                LOGGER.warn("Unable to process alarm update request.", exception);
-            }
+        try {
+            return process(request);
+        } catch (Exception exception) {
+            LOGGER.warn("Unable to process alarm update request.", exception);
+            return AlarmCodeUpdateResult.ignored("processing error: " + exception.getClass().getSimpleName());
         }
     }
 
-    void process(AlarmCodeUpdateRequest request) {
+    AlarmCodeUpdateResult process(AlarmCodeUpdateRequest request) {
         Device device = resolveDevice(request.externalDeviceId());
         if (device == null) {
             LOGGER.warn("No device found for EV12 deviceId '{}' while applying alarm code '{}'", request.externalDeviceId(), request.alarmCode());
-            return;
+            return AlarmCodeUpdateResult.ignored("no matching device found by externalDeviceId");
         }
         if (isStaleSosUpdate(device, request)) {
             LOGGER.info(
@@ -89,7 +57,7 @@ public class AlarmCodeUpdateWorkerService {
                 request.updatedAt(),
                 device.getAlarmCancelledAt()
             );
-            return;
+            return AlarmCodeUpdateResult.ignored("stale sos event older than alarmCancelledAt");
         }
 
         if (sameAlarmCode(device.getAlarmCode(), request.alarmCode())) {
@@ -99,7 +67,7 @@ public class AlarmCodeUpdateWorkerService {
                 device.getAlarmCode(),
                 request.alarmCode()
             );
-            return;
+            return AlarmCodeUpdateResult.ignored("alarm code unchanged");
         }
 
         device.setAlarmCode(request.alarmCode());
@@ -117,6 +85,11 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getAlarmCode(),
             updatedAt
         ));
+        return AlarmCodeUpdateResult.applied(
+            savedDevice.getId(),
+            savedDevice.getExternalDeviceId(),
+            savedDevice.getAlarmCode()
+        );
     }
 
     private boolean isStaleSosUpdate(Device device, AlarmCodeUpdateRequest request) {

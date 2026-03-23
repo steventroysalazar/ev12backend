@@ -1,10 +1,11 @@
 package com.example.smsbackend.repository;
 
 import com.example.smsbackend.entity.Ev12WebhookEvent;
-import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface Ev12WebhookEventRepository extends JpaRepository<Ev12WebhookEvent, Long> {
 
-    List<Ev12WebhookEvent> findTop3ByOrderByReceivedAtDesc();
+    Page<Ev12WebhookEvent> findAllByOrderByReceivedAtDesc(Pageable pageable);
 }

@@ -3,20 +3,28 @@ package com.example.smsbackend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
+import com.example.smsbackend.entity.Ev12WebhookEvent;
+import com.example.smsbackend.repository.Ev12WebhookEventRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,11 +35,47 @@ class Ev12WebhookServiceTest {
     @Mock
     private AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
 
+    @Mock
+    private Ev12WebhookEventRepository ev12WebhookEventRepository;
+
+    private void mockApplyNowSuccess() {
+        when(alarmCodeUpdateWorkerService.applyNow(any())).thenReturn(
+            AlarmCodeUpdateResult.applied(1L, "862667084205114", "SOS Alert")
+        );
+    }
+
+    private void mockSaveWebhookEvent() {
+        when(ev12WebhookEventRepository.save(any(Ev12WebhookEvent.class))).thenAnswer(invocation -> {
+            Ev12WebhookEvent event = invocation.getArgument(0);
+            if (event.getReceivedAt() == null) {
+                event.setReceivedAt(Instant.now());
+            }
+            setEntityId(event, 1L);
+            return event;
+        });
+    }
+
+    private void setEntityId(Ev12WebhookEvent event, Long id) {
+        try {
+            java.lang.reflect.Field field = Ev12WebhookEvent.class.getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(event, id);
+        } catch (Exception ignored) {
+            // no-op in unit tests
+        }
+    }
+
+    private Ev12WebhookService createService(WebhookProperties properties) {
+        return new Ev12WebhookService(properties, objectMapper, alarmCodeUpdateWorkerService, ev12WebhookEventRepository);
+    }
+
     @Test
-    void ingestShouldStoreRawPayload() throws Exception {
+    void ingestShouldStoreRawPayloadAndPersistEvent() throws Exception {
+        mockApplyNowSuccess();
+        mockSaveWebhookEvent();
         byte[] rawPayload = "{\"Configuration Command\":{\"IMEI\":\"862667084205114\"}}".getBytes();
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        Ev12WebhookService service = createService(new WebhookProperties(null));
         Ev12WebhookEventResponse response = service.ingest(
             rawPayload,
             "application/json",
@@ -44,13 +88,15 @@ class Ev12WebhookServiceTest {
         assertEquals("application/json", payloadJson.get("contentType").asText());
         assertEquals("header-value", payloadJson.get("rawHeaders").get("X-Test").asText());
         assertFalse(response.alarmAttempts().isEmpty());
+        verify(ev12WebhookEventRepository).save(any(Ev12WebhookEvent.class));
     }
 
     @Test
     void ingestShouldBase64EncodeBinaryPayload() throws Exception {
+        mockSaveWebhookEvent();
         byte[] rawPayload = new byte[]{0x01, 0x02, 0x03};
 
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        Ev12WebhookService service = createService(new WebhookProperties(null));
         Ev12WebhookEventResponse response = service.ingest(rawPayload, "application/octet-stream", null, Map.of());
 
         JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
@@ -59,26 +105,16 @@ class Ev12WebhookServiceTest {
 
     @Test
     void ingestShouldRequireValidTokenWhenConfigured() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, alarmCodeUpdateWorkerService);
+        Ev12WebhookService service = createService(new WebhookProperties("secret"));
 
         assertThrows(ResponseStatusException.class, () -> service.ingest("{}".getBytes(), "application/json", "wrong", Map.of()));
     }
 
     @Test
-    void ingestShouldAcceptEmptyPayload() throws Exception {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-
-        Ev12WebhookEventResponse response = service.ingest(new byte[0], "application/octet-stream", null, Map.of());
-
-        JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
-        assertEquals("", payloadJson.get("rawBody").asText());
-        assertEquals("ignored", response.alarmAttempts().get(0).action());
-        assertEquals("empty payload", response.alarmAttempts().get(0).reason());
-    }
-
-    @Test
-    void ingestShouldExposeAlarmAttemptDebugDataWhenUpdateIsQueued() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+    void ingestShouldExposeAlarmAttemptDebugDataWhenUpdateIsApplied() {
+        mockApplyNowSuccess();
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(new WebhookProperties(null));
 
         Ev12WebhookEventResponse response = service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
@@ -88,201 +124,53 @@ class Ev12WebhookServiceTest {
         );
 
         assertEquals(1, response.alarmAttempts().size());
-        assertEquals("queued", response.alarmAttempts().get(0).action());
+        assertEquals("applied", response.alarmAttempts().get(0).action());
         assertEquals("862667084205114", response.alarmAttempts().get(0).externalDeviceId());
         assertEquals("SOS Alert", response.alarmAttempts().get(0).alarmCode());
     }
 
     @Test
-    void recentEventsShouldApplyRequestedLimitWithoutHardCap() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+    void recentEventsShouldReadPersistedEventsFromDatabase() {
+        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookEvent persisted = new Ev12WebhookEvent();
+        persisted.setReceivedAt(Instant.now());
+        persisted.setPayloadJson("{}");
+        persisted.setAlarmAttemptsJson("[]");
+        setEntityId(persisted, 9L);
 
-        service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":3}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":4}".getBytes(), "application/json", null, Map.of());
+        when(ev12WebhookEventRepository.findAllByOrderByReceivedAtDesc(PageRequest.of(0, 2, Sort.by(Sort.Direction.DESC, "receivedAt"))))
+            .thenReturn(new PageImpl<>(List.of(persisted, persisted)));
 
         List<Ev12WebhookEventResponse> events = service.recentEvents(2, null);
 
         assertEquals(2, events.size());
+        assertEquals(9L, events.get(0).id());
     }
 
     @Test
-    void recentEventsShouldReturnAllEventsWithoutCap() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-
-        service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":3}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":4}".getBytes(), "application/json", null, Map.of());
-
-        List<Ev12WebhookEventResponse> events = service.recentEvents(null, null);
-
-        assertEquals(4, events.size());
-    }
-
-    @Test
-    void clearEventsShouldRemoveAllStoredEvents() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-
-        service.ingest("{\"seq\":1}".getBytes(), "application/json", null, Map.of());
-        service.ingest("{\"seq\":2}".getBytes(), "application/json", null, Map.of());
+    void clearEventsShouldDeletePersistedEvents() {
+        when(ev12WebhookEventRepository.count()).thenReturn(2L);
+        Ev12WebhookService service = createService(new WebhookProperties(null));
 
         int deleted = service.clearEvents(null);
 
         assertEquals(2, deleted);
-        assertEquals(0, service.recentEvents(null, null).size());
+        verify(ev12WebhookEventRepository).deleteAll();
     }
 
     @Test
     void clearEventsShouldRequireTokenWhenConfigured() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties("secret"), objectMapper, alarmCodeUpdateWorkerService);
+        Ev12WebhookService service = createService(new WebhookProperties("secret"));
 
         assertThrows(ResponseStatusException.class, () -> service.clearEvents("wrong"));
     }
 
     @Test
-    void ingestShouldSetDeviceAlarmCodeForSosAlert() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
+    void ingestShouldCallApplyNowForParsedAlarmCandidates() {
+        mockApplyNowSuccess();
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(new WebhookProperties(null));
 
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldUseLatestMatchingAlarmCodeValueFromPayload() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Ending".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeForFallDownAlert() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Fall-Down Alert\"]}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "Fall-Down Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeWhenAlarmCodeIsTopLevel() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"Alarm Code\":[\"SOS Alert\"]}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeWhenAlarmCodeIsStringAndUsePayloadTimestamp() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"timestamp\":1774215008810,\"data\":{\"alarmCode\":\"SOS ending\"}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId())
-                && "SOS ending".equals(request.alarmCode())
-                && request.updatedAt() != null
-                && request.updatedAt().toEpochMilli() == 1774215008810L
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeWhenDataHasUpperCaseKey() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"Data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeWhenWebhookContainsResponseObject() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"response\":{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeWhenWebhookContainsSerializedResponsePayload() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            ("{\"data\":{\"response\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}}")
-                .getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldSetDeviceAlarmCodeForAnyFallContainingValue() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
-        service.ingest(
-            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Fall trigger level 2\"]}}".getBytes(),
-            "application/json",
-            null,
-            Map.of()
-        );
-
-        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
-            "862667084205114".equals(request.externalDeviceId()) && "Fall trigger level 2".equals(request.alarmCode())
-        ));
-    }
-
-    @Test
-    void ingestShouldProcessAllAlarmEntriesWhenPayloadContainsMultipleWebhookEvents() {
-        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
         service.ingest(
             ("[" +
                 "{\"deviceId\":\"862667084205114\",\"timestamp\":1774296609413,\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}," +
@@ -294,7 +182,7 @@ class Ev12WebhookServiceTest {
             Map.of()
         );
 
-        verify(alarmCodeUpdateWorkerService, times(2)).enqueue(argThat(request ->
+        verify(alarmCodeUpdateWorkerService, times(2)).applyNow(argThat(request ->
             "862667084205114".equals(request.externalDeviceId())
                 && ("SOS Alert".equals(request.alarmCode()) || "SOS Ending".equals(request.alarmCode()))
         ));

@@ -536,6 +536,38 @@ Ingest EV12 webhook payload in any content type.
 **Response**
 - HTTP `201 Created`
 - Includes `{ "success": true, "event": ... }`
+- Event + alarmAttempts are persisted in database table `ev12_webhook_events` for troubleshooting history.
+
+**Webhook debug fields in `event`**
+- `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
+- `candidateIndex`: index of parsed payload candidate (helps when webhook contains nested/array entries).
+- `externalDeviceId`: device id extracted from webhook (what backend tries to match with device `externalDeviceId`).
+- `alarmCode`: alarm code extracted (`SOS Alert`, `SOS Ending`, `Fall-Down Alert`, etc.).
+- `eventTimestamp`: timestamp backend will use for update ordering.
+- `action`: backend action (`applied` or `ignored`).
+- `reason`: short explanation (for example `missing deviceId`, `missing alarm code`, `alarm code does not contain sos/fall`, `malformed or non-json payload`).
+
+**Example response (debug-friendly)**
+```json
+{
+  "success": true,
+  "event": {
+    "id": 17,
+    "receivedAt": "2026-03-23T11:15:22.112Z",
+    "payloadJson": "{\"rawHeaders\":{\"x-webhook-token\":\"***\"},\"contentType\":\"application/json\",\"rawBody\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}",
+    "alarmAttempts": [
+      {
+        "candidateIndex": 0,
+        "externalDeviceId": "862667084205114",
+        "alarmCode": "SOS Alert",
+        "eventTimestamp": "2026-03-23T11:15:22.111Z",
+        "action": "applied",
+        "reason": "alarm code updated"
+      }
+    ]
+  }
+}
+```
 
 **Webhook debug fields in `event`**
 - `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
@@ -582,6 +614,7 @@ Return recent ingested EV12 webhook events.
 
 **Query params**
 - `limit` (optional; returns all when not provided)
+- Reads from persisted `ev12_webhook_events` records (latest first).
 
 **Optional headers**
 - `X-Webhook-Token`
@@ -610,7 +643,8 @@ Clear stored EV12 webhook history.
   - extracted `externalDeviceId`
   - extracted `alarmCode`
   - `action` + `reason` (this tells you what backend tried to do and why).
-  - If `action=queued` but device state still does not change, compare `externalDeviceId` with your device record and check backend application logs for `Alarm code updated` / `No device found` entries.
+  - If `action=ignored`, the `reason` explains exactly why it was not written to DB (example: `no matching device found by externalDeviceId`).
+  - If `action=applied`, DB update already happened in the same webhook request.
 - Token precedence on gateway-backed endpoints:
   1. `Authorization`
   2. `X-Gateway-Token`

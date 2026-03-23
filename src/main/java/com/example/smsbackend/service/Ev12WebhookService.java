@@ -2,6 +2,7 @@ package com.example.smsbackend.service;
 
 import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
+import com.example.smsbackend.dto.WebhookAlarmAttemptResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class Ev12WebhookService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Ev12WebhookService.class);
 
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
@@ -51,12 +56,13 @@ public class Ev12WebhookService {
         Map<String, String> rawHeaders
     ) {
         validateToken(providedToken);
-        updateDeviceAlarmCode(rawPayload);
+        List<WebhookAlarmAttemptResponse> alarmAttempts = updateDeviceAlarmCode(rawPayload);
 
         Ev12WebhookEventResponse event = new Ev12WebhookEventResponse(
             eventIdSequence.getAndIncrement(),
             Instant.now(),
-            serializePayload(rawPayload, contentType, rawHeaders)
+            serializePayload(rawPayload, contentType, rawHeaders),
+            alarmAttempts
         );
 
         recentEvents.addFirst(event);
@@ -85,38 +91,98 @@ public class Ev12WebhookService {
         return deletedCount;
     }
 
-    private void updateDeviceAlarmCode(byte[] rawPayload) {
+    private List<WebhookAlarmAttemptResponse> updateDeviceAlarmCode(byte[] rawPayload) {
+        List<WebhookAlarmAttemptResponse> alarmAttempts = new ArrayList<>();
         if (rawPayload == null || rawPayload.length == 0) {
-            return;
+            alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                0,
+                null,
+                null,
+                null,
+                "ignored",
+                "empty payload"
+            ));
+            return alarmAttempts;
         }
 
         try {
             JsonNode root = objectMapper.readTree(new String(rawPayload, StandardCharsets.UTF_8));
+            int candidateIndex = 0;
             for (JsonNode candidatePayload : candidatePayloads(root)) {
                 String externalDeviceId = extractExternalDeviceId(candidatePayload);
                 if (!StringUtils.hasText(externalDeviceId)) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        null,
+                        null,
+                        null,
+                        "ignored",
+                        "missing deviceId"
+                    ));
                     continue;
                 }
 
                 JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
                 if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        externalDeviceId.trim(),
+                        null,
+                        null,
+                        "ignored",
+                        "missing alarm code"
+                    ));
                     continue;
                 }
 
                 String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
                 if (nextAlarmCode == null) {
+                    alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                        candidateIndex++,
+                        externalDeviceId.trim(),
+                        null,
+                        null,
+                        "ignored",
+                        "alarm code does not contain sos/fall"
+                    ));
                     continue;
                 }
 
+                Instant eventTimestamp = extractEventTimestamp(candidatePayload);
                 alarmCodeUpdateWorkerService.enqueue(new AlarmCodeUpdateRequest(
                     externalDeviceId.trim(),
                     nextAlarmCode,
-                    extractEventTimestamp(candidatePayload)
+                    eventTimestamp
                 ));
+                WebhookAlarmAttemptResponse attempt = new WebhookAlarmAttemptResponse(
+                    candidateIndex++,
+                    externalDeviceId.trim(),
+                    nextAlarmCode,
+                    eventTimestamp,
+                    "queued",
+                    "alarm update enqueued"
+                );
+                alarmAttempts.add(attempt);
+                LOGGER.info(
+                    "EV12 webhook queued alarm update: deviceId='{}', alarmCode='{}', eventTimestamp='{}'",
+                    attempt.externalDeviceId(),
+                    attempt.alarmCode(),
+                    attempt.eventTimestamp()
+                );
             }
         } catch (Exception ignored) {
             // Ignore malformed webhook payloads. Raw payload is still stored for diagnostics.
+            alarmAttempts.add(new WebhookAlarmAttemptResponse(
+                0,
+                null,
+                null,
+                null,
+                "ignored",
+                "malformed or non-json payload"
+            ));
+            LOGGER.warn("EV12 webhook payload could not be parsed for alarm updates.");
         }
+        return alarmAttempts;
     }
 
     private List<JsonNode> candidatePayloads(JsonNode root) {

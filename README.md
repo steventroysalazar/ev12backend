@@ -569,6 +569,37 @@ Ingest EV12 webhook payload in any content type.
 }
 ```
 
+**Webhook debug fields in `event`**
+- `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
+- `candidateIndex`: index of parsed payload candidate (helps when webhook contains nested/array entries).
+- `externalDeviceId`: device id extracted from webhook (what backend tries to match with device `externalDeviceId`).
+- `alarmCode`: alarm code extracted (`SOS Alert`, `SOS Ending`, `Fall-Down Alert`, etc.).
+- `eventTimestamp`: timestamp backend will use for update ordering.
+- `action`: backend action (`queued` or `ignored`).
+- `reason`: short explanation (for example `missing deviceId`, `missing alarm code`, `alarm code does not contain sos/fall`, `malformed or non-json payload`).
+
+**Example response (debug-friendly)**
+```json
+{
+  "success": true,
+  "event": {
+    "id": 17,
+    "receivedAt": "2026-03-23T11:15:22.112Z",
+    "payloadJson": "{\"rawHeaders\":{\"x-webhook-token\":\"***\"},\"contentType\":\"application/json\",\"rawBody\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}",
+    "alarmAttempts": [
+      {
+        "candidateIndex": 0,
+        "externalDeviceId": "862667084205114",
+        "alarmCode": "SOS Alert",
+        "eventTimestamp": "2026-03-23T11:15:22.111Z",
+        "action": "queued",
+        "reason": "alarm update enqueued"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 

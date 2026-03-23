@@ -135,7 +135,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void ingestShouldNormalizeSosEndingToSosAlert() {
+    void ingestShouldUseFirstMatchingAlarmCodeValueFromPayload() {
         Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
         service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\",\"SOS Ending\"]}}".getBytes(),
@@ -191,7 +191,7 @@ class Ev12WebhookServiceTest {
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
             "862667084205114".equals(request.externalDeviceId())
-                && "SOS Alert".equals(request.alarmCode())
+                && "SOS ending".equals(request.alarmCode())
                 && request.updatedAt() != null
                 && request.updatedAt().toEpochMilli() == 1774215008810L
         ));
@@ -240,6 +240,21 @@ class Ev12WebhookServiceTest {
 
         verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
             "862667084205114".equals(request.externalDeviceId()) && "SOS Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
+    void ingestShouldSetDeviceAlarmCodeForAnyFallContainingValue() {
+        Ev12WebhookService service = new Ev12WebhookService(new WebhookProperties(null), objectMapper, alarmCodeUpdateWorkerService);
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Fall trigger level 2\"]}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService).enqueue(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId()) && "Fall trigger level 2".equals(request.alarmCode())
         ));
     }
 }

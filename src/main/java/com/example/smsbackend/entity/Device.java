@@ -35,6 +35,15 @@ public class Device {
     @Column(name = "alarm_cancelled_at")
     private Instant alarmCancelledAt;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "location_updated_at")
+    private Instant locationUpdatedAt;
+
     @Lob
     @Column(name = "protocol_config")
     private String protocolConfig;
@@ -98,6 +107,30 @@ public class Device {
 
     public void setAlarmCancelledAt(Instant alarmCancelledAt) {
         this.alarmCancelledAt = alarmCancelledAt;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
+    public Instant getLocationUpdatedAt() {
+        return locationUpdatedAt;
+    }
+
+    public void setLocationUpdatedAt(Instant locationUpdatedAt) {
+        this.locationUpdatedAt = locationUpdatedAt;
     }
 
     public AppUser getUser() {

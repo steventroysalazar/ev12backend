@@ -40,6 +40,7 @@ public class Ev12WebhookService {
     private final WebhookProperties webhookProperties;
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
+    private final DeviceLocationUpdateService deviceLocationUpdateService;
     private final Ev12WebhookEventRepository ev12WebhookEventRepository;
     private final Deque<Ev12WebhookEventResponse> inMemoryEvents = new ArrayDeque<>();
     private final AtomicLong inMemoryEventSequence = new AtomicLong(0);
@@ -48,11 +49,13 @@ public class Ev12WebhookService {
         WebhookProperties webhookProperties,
         ObjectMapper objectMapper,
         AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService,
+        DeviceLocationUpdateService deviceLocationUpdateService,
         Ev12WebhookEventRepository ev12WebhookEventRepository
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
         this.alarmCodeUpdateWorkerService = alarmCodeUpdateWorkerService;
+        this.deviceLocationUpdateService = deviceLocationUpdateService;
         this.ev12WebhookEventRepository = ev12WebhookEventRepository;
     }
 
@@ -204,6 +207,17 @@ public class Ev12WebhookService {
                     continue;
                 }
 
+                Instant eventTimestamp = extractEventTimestamp(candidatePayload);
+                Coordinates coordinates = extractCoordinates(candidatePayload);
+                if (coordinates != null) {
+                    deviceLocationUpdateService.applyNow(
+                        externalDeviceId.trim(),
+                        coordinates.latitude(),
+                        coordinates.longitude(),
+                        eventTimestamp
+                    );
+                }
+
                 JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
                 if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
                     alarmAttempts.add(new WebhookAlarmAttemptResponse(
@@ -230,7 +244,6 @@ public class Ev12WebhookService {
                     continue;
                 }
 
-                Instant eventTimestamp = extractEventTimestamp(candidatePayload);
                 AlarmCodeUpdateResult updateResult = alarmCodeUpdateWorkerService.applyNow(new AlarmCodeUpdateRequest(
                     externalDeviceId.trim(),
                     nextAlarmCode,
@@ -383,6 +396,71 @@ public class Ev12WebhookService {
         }
 
         return JsonNodeFactory.instance.missingNode();
+    }
+
+    private JsonNode extractGpsLocationNode(JsonNode root) {
+        JsonNode topLevel = firstPresentNode(root, "GPS Location", "gpsLocation", "gps_location");
+        if (!topLevel.isMissingNode() && !topLevel.isNull()) {
+            return topLevel;
+        }
+
+        JsonNode data = firstPresentNode(root, "data", "Data");
+        if (!data.isMissingNode() && !data.isNull()) {
+            JsonNode nested = firstPresentNode(data, "GPS Location", "gpsLocation", "gps_location");
+            if (!nested.isMissingNode() && !nested.isNull()) {
+                return nested;
+            }
+        }
+
+        return JsonNodeFactory.instance.missingNode();
+    }
+
+    private Coordinates extractCoordinates(JsonNode root) {
+        JsonNode gpsNode = extractGpsLocationNode(root);
+        if (gpsNode.isMissingNode() || gpsNode.isNull()) {
+            return null;
+        }
+
+        if (gpsNode.isArray()) {
+            for (JsonNode item : gpsNode) {
+                Coordinates coordinates = parseCoordinates(item);
+                if (coordinates != null) {
+                    return coordinates;
+                }
+            }
+            return null;
+        }
+        return parseCoordinates(gpsNode);
+    }
+
+    private Coordinates parseCoordinates(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+
+        Double latitude = parseDouble(firstPresentNode(node, "latitude", "lat"));
+        Double longitude = parseDouble(firstPresentNode(node, "longitude", "lng", "lon"));
+        if (latitude == null || longitude == null) {
+            return null;
+        }
+        return new Coordinates(latitude, longitude);
+    }
+
+    private Double parseDouble(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.asDouble();
+        }
+        if (!node.isTextual()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(node.asText().trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private JsonNode firstPresentNode(JsonNode node, String... fieldNames) {
@@ -557,4 +635,6 @@ public class Ev12WebhookService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid webhook token");
         }
     }
+
+    private record Coordinates(Double latitude, Double longitude) {}
 }

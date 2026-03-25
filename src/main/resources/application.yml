@@ -25,3 +25,5 @@ gateway:
 
 webhook:
   ev12-token: ${WEBHOOK_EV12_TOKEN:}
+  ev12-persist-events: ${WEBHOOK_EV12_PERSIST_EVENTS:false}
+  ev12-in-memory-events-max: ${WEBHOOK_EV12_IN_MEMORY_EVENTS_MAX:1000}

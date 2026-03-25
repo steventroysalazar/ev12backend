@@ -536,7 +536,10 @@ Ingest EV12 webhook payload in any content type.
 **Response**
 - HTTP `201 Created`
 - Includes `{ "success": true, "event": ... }`
-- Event + alarmAttempts are persisted in database table `ev12_webhook_events` for troubleshooting history.
+- Alarm update processing always runs in background from the webhook payload.
+- Event history storage is configurable:
+  - `webhook.ev12-persist-events=true`: save in database table `ev12_webhook_events`
+  - `webhook.ev12-persist-events=false` (default): keep only in-memory recent history
 
 **Webhook debug fields in `event`**
 - `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
@@ -614,7 +617,8 @@ Return recent ingested EV12 webhook events.
 
 **Query params**
 - `limit` (optional; defaults to `200`)
-- Reads from persisted `ev12_webhook_events` records (latest first).
+- Max `limit` is `500` per request.
+- Reads latest events from DB or from in-memory history, depending on `webhook.ev12-persist-events`.
 
 **Optional headers**
 - `X-Webhook-Token`
@@ -632,6 +636,7 @@ Return recent ingested EV12 webhook events.
 - Direct SQL fallback:
   - `DELETE FROM ev12_webhook_events;`
   - `VACUUM (ANALYZE) ev12_webhook_events;` (Postgres)
+- If `webhook.ev12-persist-events=false`, there is no DB table write for webhook history; `DELETE /api/webhooks/ev12/events` clears in-memory history only.
 
 ---
 ### `DELETE /api/webhooks/ev12/events`

@@ -13,12 +13,15 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +41,8 @@ public class Ev12WebhookService {
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
     private final Ev12WebhookEventRepository ev12WebhookEventRepository;
+    private final Deque<Ev12WebhookEventResponse> inMemoryEvents = new ArrayDeque<>();
+    private final AtomicLong inMemoryEventSequence = new AtomicLong(0);
 
     public Ev12WebhookService(
         WebhookProperties webhookProperties,
@@ -64,13 +69,19 @@ public class Ev12WebhookService {
         Instant receivedAt = Instant.now();
         String payloadJson = serializePayload(rawPayload, contentType, rawHeaders);
         String alarmAttemptsJson = serializeAlarmAttempts(alarmAttempts);
-        Ev12WebhookEvent saved = persistWebhookEvent(payloadJson, alarmAttemptsJson, alarmAttempts, receivedAt);
-        return toResponse(saved);
+        if (webhookProperties.ev12PersistEvents()) {
+            Ev12WebhookEvent saved = persistWebhookEvent(payloadJson, alarmAttemptsJson, alarmAttempts, receivedAt);
+            return toResponse(saved);
+        }
+        return persistInMemoryEvent(payloadJson, alarmAttempts, receivedAt);
     }
 
     public synchronized List<Ev12WebhookEventResponse> recentEvents(Integer limit, String providedToken) {
         validateToken(providedToken);
         int normalizedLimit = limit == null ? 200 : Math.max(1, Math.min(limit, 500));
+        if (!webhookProperties.ev12PersistEvents()) {
+            return inMemoryEvents.stream().limit(normalizedLimit).toList();
+        }
         return ev12WebhookEventRepository.findAllByOrderByReceivedAtDesc(PageRequest.of(
             0,
             normalizedLimit,
@@ -83,10 +94,35 @@ public class Ev12WebhookService {
 
     public synchronized int clearEvents(String providedToken) {
         validateToken(providedToken);
+        if (!webhookProperties.ev12PersistEvents()) {
+            int deletedCount = inMemoryEvents.size();
+            inMemoryEvents.clear();
+            return deletedCount;
+        }
 
         int deletedCount = Math.toIntExact(ev12WebhookEventRepository.count());
         ev12WebhookEventRepository.deleteAll();
         return deletedCount;
+    }
+
+    private Ev12WebhookEventResponse persistInMemoryEvent(
+        String payloadJson,
+        List<WebhookAlarmAttemptResponse> alarmAttempts,
+        Instant receivedAt
+    ) {
+        int maxInMemoryEvents = Math.max(1, webhookProperties.ev12InMemoryEventsMax());
+        Long eventId = inMemoryEventSequence.incrementAndGet();
+        Ev12WebhookEventResponse event = new Ev12WebhookEventResponse(
+            eventId,
+            receivedAt,
+            payloadJson,
+            alarmAttempts == null ? List.of() : List.copyOf(alarmAttempts)
+        );
+        inMemoryEvents.addFirst(event);
+        while (inMemoryEvents.size() > maxInMemoryEvents) {
+            inMemoryEvents.removeLast();
+        }
+        return event;
     }
 
     private Ev12WebhookEvent persistWebhookEvent(

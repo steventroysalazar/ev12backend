@@ -1,7 +1,11 @@
 package com.example.smsbackend.controller;
 
 import com.example.smsbackend.service.GatewayClientException;
+import java.time.Instant;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +15,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(GatewayClientException.class)
     public ResponseEntity<Map<String, Object>> handleGateway(GatewayClientException e) {
@@ -54,6 +60,17 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(status).body(Map.of(
             "success", false,
             "error", e.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException e) {
+        LOGGER.error("Database error while handling API request.", e);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+            "success", false,
+            "error", "Database unavailable",
+            "message", "The service cannot access its database right now. Please retry shortly.",
+            "timestamp", Instant.now().toString()
         ));
     }
 

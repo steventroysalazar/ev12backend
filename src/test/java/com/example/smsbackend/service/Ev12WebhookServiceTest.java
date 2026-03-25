@@ -69,13 +69,17 @@ class Ev12WebhookServiceTest {
         return new Ev12WebhookService(properties, objectMapper, alarmCodeUpdateWorkerService, ev12WebhookEventRepository);
     }
 
+    private WebhookProperties dbProperties(String token) {
+        return new WebhookProperties(token, true, 1000);
+    }
+
     @Test
     void ingestShouldStoreRawPayloadAndPersistEvent() throws Exception {
         mockApplyNowSuccess();
         mockSaveWebhookEvent();
         byte[] rawPayload = "{\"Configuration Command\":{\"IMEI\":\"862667084205114\"}}".getBytes();
 
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
         Ev12WebhookEventResponse response = service.ingest(
             rawPayload,
             "application/json",
@@ -96,7 +100,7 @@ class Ev12WebhookServiceTest {
         mockSaveWebhookEvent();
         byte[] rawPayload = new byte[]{0x01, 0x02, 0x03};
 
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
         Ev12WebhookEventResponse response = service.ingest(rawPayload, "application/octet-stream", null, Map.of());
 
         JsonNode payloadJson = objectMapper.readTree(response.payloadJson());
@@ -105,7 +109,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void ingestShouldRequireValidTokenWhenConfigured() {
-        Ev12WebhookService service = createService(new WebhookProperties("secret"));
+        Ev12WebhookService service = createService(dbProperties("secret"));
 
         assertThrows(ResponseStatusException.class, () -> service.ingest("{}".getBytes(), "application/json", "wrong", Map.of()));
     }
@@ -114,7 +118,7 @@ class Ev12WebhookServiceTest {
     void ingestShouldExposeAlarmAttemptDebugDataWhenUpdateIsApplied() {
         mockApplyNowSuccess();
         mockSaveWebhookEvent();
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
 
         Ev12WebhookEventResponse response = service.ingest(
             "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
@@ -131,7 +135,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void recentEventsShouldReadPersistedEventsFromDatabase() {
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
         Ev12WebhookEvent persisted = new Ev12WebhookEvent();
         persisted.setReceivedAt(Instant.now());
         persisted.setPayloadJson("{}");
@@ -150,7 +154,7 @@ class Ev12WebhookServiceTest {
     @Test
     void clearEventsShouldDeletePersistedEvents() {
         when(ev12WebhookEventRepository.count()).thenReturn(2L);
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
 
         int deleted = service.clearEvents(null);
 
@@ -160,7 +164,7 @@ class Ev12WebhookServiceTest {
 
     @Test
     void clearEventsShouldRequireTokenWhenConfigured() {
-        Ev12WebhookService service = createService(new WebhookProperties("secret"));
+        Ev12WebhookService service = createService(dbProperties("secret"));
 
         assertThrows(ResponseStatusException.class, () -> service.clearEvents("wrong"));
     }
@@ -169,7 +173,7 @@ class Ev12WebhookServiceTest {
     void ingestShouldCallApplyNowForParsedAlarmCandidates() {
         mockApplyNowSuccess();
         mockSaveWebhookEvent();
-        Ev12WebhookService service = createService(new WebhookProperties(null));
+        Ev12WebhookService service = createService(dbProperties(null));
 
         service.ingest(
             ("[" +
@@ -186,5 +190,37 @@ class Ev12WebhookServiceTest {
             "862667084205114".equals(request.externalDeviceId())
                 && ("SOS Alert".equals(request.alarmCode()) || "SOS Ending".equals(request.alarmCode()))
         ));
+    }
+
+    @Test
+    void ingestShouldKeepHistoryInMemoryWhenPersistenceDisabled() {
+        mockApplyNowSuccess();
+        Ev12WebhookService service = createService(new WebhookProperties(null, false, 1000));
+
+        service.ingest(
+            "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"SOS Alert\"]}}".getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        List<Ev12WebhookEventResponse> events = service.recentEvents(10, null);
+        assertEquals(1, events.size());
+        verify(ev12WebhookEventRepository, times(0)).save(any(Ev12WebhookEvent.class));
+        verify(alarmCodeUpdateWorkerService, times(1)).applyNow(any());
+    }
+
+    @Test
+    void clearEventsShouldClearInMemoryHistoryWhenPersistenceDisabled() {
+        mockApplyNowSuccess();
+        Ev12WebhookService service = createService(new WebhookProperties(null, false, 2));
+
+        service.ingest("{}".getBytes(), "application/json", null, Map.of());
+        service.ingest("{}".getBytes(), "application/json", null, Map.of());
+        int deleted = service.clearEvents(null);
+
+        assertEquals(2, deleted);
+        assertEquals(0, service.recentEvents(10, null).size());
+        verify(ev12WebhookEventRepository, times(0)).deleteAll();
     }
 }

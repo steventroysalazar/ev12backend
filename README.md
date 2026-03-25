@@ -613,14 +613,27 @@ Ingest EV12 webhook payload in any content type.
 Return recent ingested EV12 webhook events.
 
 **Query params**
-- `limit` (optional; returns all when not provided)
+- `limit` (optional; defaults to `200`)
 - Reads from persisted `ev12_webhook_events` records (latest first).
 
 **Optional headers**
 - `X-Webhook-Token`
 
----
+**Common failure mode**
+- If storage is temporarily unavailable, API returns `503 Service Unavailable` with JSON:
+  - `error: "Database unavailable"`
+  - `message: "The service cannot access its database right now. Please retry shortly."`
+- If this API is behind Vercel/Azure/NGINX, that upstream `503` can appear in browser devtools as `502 Bad Gateway`.
 
+**Should you clear the table?**
+- Usually **no**: clearing `ev12_webhook_events` does not fix DB connectivity/auth/network failures.
+- It can still help if your history table became very large and requests are timing out.
+- Preferred cleanup path is `DELETE /api/webhooks/ev12/events` (same webhook token rules).
+- Direct SQL fallback:
+  - `DELETE FROM ev12_webhook_events;`
+  - `VACUUM (ANALYZE) ev12_webhook_events;` (Postgres)
+
+---
 ### `DELETE /api/webhooks/ev12/events`
 Clear stored EV12 webhook history.
 

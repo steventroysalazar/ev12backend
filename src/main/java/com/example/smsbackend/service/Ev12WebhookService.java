@@ -444,7 +444,11 @@ public class Ev12WebhookService {
         if (!StringUtils.hasText(value)) {
             return false;
         }
-        return value.toLowerCase(Locale.ROOT).contains("sos");
+        String normalized = value.toLowerCase(Locale.ROOT);
+        if (!normalized.contains("sos")) {
+            return false;
+        }
+        return !normalized.contains("ending");
     }
 
     private boolean isFallLike(String value) {

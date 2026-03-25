@@ -170,7 +170,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void ingestShouldCallApplyNowForParsedAlarmCandidates() {
+    void ingestShouldIgnoreSosEndingAndOnlyApplyActiveAlarmCandidates() {
         mockApplyNowSuccess();
         mockSaveWebhookEvent();
         Ev12WebhookService service = createService(dbProperties(null));
@@ -186,9 +186,9 @@ class Ev12WebhookServiceTest {
             Map.of()
         );
 
-        verify(alarmCodeUpdateWorkerService, times(2)).applyNow(argThat(request ->
+        verify(alarmCodeUpdateWorkerService, times(1)).applyNow(argThat(request ->
             "862667084205114".equals(request.externalDeviceId())
-                && ("SOS Alert".equals(request.alarmCode()) || "SOS Ending".equals(request.alarmCode()))
+                && "SOS Alert".equals(request.alarmCode())
         ));
     }
 

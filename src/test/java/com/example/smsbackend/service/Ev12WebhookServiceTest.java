@@ -38,6 +38,9 @@ class Ev12WebhookServiceTest {
     @Mock
     private Ev12WebhookEventRepository ev12WebhookEventRepository;
 
+    @Mock
+    private DeviceLocationUpdateService deviceLocationUpdateService;
+
     private void mockApplyNowSuccess() {
         when(alarmCodeUpdateWorkerService.applyNow(any())).thenReturn(
             AlarmCodeUpdateResult.applied(1L, "862667084205114", "SOS Alert")
@@ -66,7 +69,13 @@ class Ev12WebhookServiceTest {
     }
 
     private Ev12WebhookService createService(WebhookProperties properties) {
-        return new Ev12WebhookService(properties, objectMapper, alarmCodeUpdateWorkerService, ev12WebhookEventRepository);
+        return new Ev12WebhookService(
+            properties,
+            objectMapper,
+            alarmCodeUpdateWorkerService,
+            deviceLocationUpdateService,
+            ev12WebhookEventRepository
+        );
     }
 
     private WebhookProperties dbProperties(String token) {
@@ -170,7 +179,7 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
-    void ingestShouldCallApplyNowForParsedAlarmCandidates() {
+    void ingestShouldIgnoreSosEndingAndOnlyApplyActiveAlarmCandidates() {
         mockApplyNowSuccess();
         mockSaveWebhookEvent();
         Ev12WebhookService service = createService(dbProperties(null));
@@ -186,10 +195,32 @@ class Ev12WebhookServiceTest {
             Map.of()
         );
 
-        verify(alarmCodeUpdateWorkerService, times(2)).applyNow(argThat(request ->
+        verify(alarmCodeUpdateWorkerService, times(1)).applyNow(argThat(request ->
             "862667084205114".equals(request.externalDeviceId())
-                && ("SOS Alert".equals(request.alarmCode()) || "SOS Ending".equals(request.alarmCode()))
+                && "SOS Alert".equals(request.alarmCode())
         ));
+    }
+
+    @Test
+    void ingestShouldUpdateDeviceCoordinatesFromGpsLocation() {
+        mockApplyNowSuccess();
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(dbProperties(null));
+
+        service.ingest(
+            ("{\"deviceId\":\"862667084205114\",\"timestamp\":1774442897268,\"data\":{\"GPS Location\":[{\"latitude\":15.1468038,\"longitude\":120.5463361}]}}")
+                .getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(deviceLocationUpdateService).applyNow(
+            "862667084205114",
+            15.1468038,
+            120.5463361,
+            Instant.ofEpochMilli(1774442897268L)
+        );
     }
 
     @Test

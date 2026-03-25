@@ -191,6 +191,10 @@ Update device fields (partial update behavior).
 - `externalDeviceId` links the API device to EV12 webhook payload `deviceId`.
 - Device responses include alarm tracking fields for frontend state:
   - `alarmCode`: current active alarm (`SOS Alert`, `Fall-Down Alert`, or `null` when cancelled/idle)
+- Device responses include latest telemetry location fields (auto-updated by EV12 webhook GPS payloads):
+  - `latitude`: last known latitude from webhook `GPS Location`
+  - `longitude`: last known longitude from webhook `GPS Location`
+  - `locationUpdatedAt`: UTC timestamp when coordinates were last updated
 - Device responses now include config queue tracking fields:
   - `configStatus`: `IDLE`, `PENDING`, `APPLIED`
   - `configLastSentAt`: UTC timestamp of the last configuration SMS send
@@ -537,6 +541,7 @@ Ingest EV12 webhook payload in any content type.
 - HTTP `201 Created`
 - Includes `{ "success": true, "event": ... }`
 - Alarm update processing always runs in background from the webhook payload.
+- Device location update processing also runs from the same webhook payload when `GPS Location` exists.
 - Event history storage is configurable:
   - `webhook.ev12-persist-events=true`: save in database table `ev12_webhook_events`
   - `webhook.ev12-persist-events=false` (default): keep only in-memory recent history
@@ -609,8 +614,37 @@ Ingest EV12 webhook payload in any content type.
 **Alarm code tracking behavior**
 - When webhook `data["Alarm Code"]` includes `SOS Alert` and does **not** include `SOS Ending`, device `alarmCode` is set to `SOS Alert`.
 - When webhook `data["Alarm Code"]` includes `Fall-Down Alert` (and no `SOS Ending`), device `alarmCode` is set to `Fall-Down Alert`.
-- When webhook `data["Alarm Code"]` includes `SOS Ending`, device `alarmCode` is cleared to `null` (alarm cancelled).
+- When webhook has only `SOS Ending`, it is ignored for active alarm counting.
 - Alarm updates apply only when the webhook `deviceId` matches a device `externalDeviceId`.
+
+**Device GPS location auto-update behavior**
+- If webhook payload contains `data["GPS Location"]` (array or object), backend reads the first valid coordinate object.
+- Supported coordinate keys: `latitude` + `longitude` (also accepts `lat` and `lng`/`lon`).
+- Backend updates matching device fields:
+  - `latitude`
+  - `longitude`
+  - `locationUpdatedAt` (uses webhook timestamp when available, otherwise server receive time)
+- Device matching uses webhook `deviceId` against device `externalDeviceId`.
+
+**Frontend sample device response (new fields)**
+```json
+{
+  "id": 12,
+  "userId": 10,
+  "name": "Truck GPS 01",
+  "phoneNumber": "+1555999000",
+  "externalDeviceId": "862667084205114",
+  "alarmCode": "Fall-Down Alert",
+  "alarmCancelledAt": null,
+  "latitude": 15.1468038,
+  "longitude": 120.5463361,
+  "locationUpdatedAt": "2026-03-25T12:48:17.268Z",
+  "protocolSettings": null,
+  "configStatus": "IDLE",
+  "configLastSentAt": null,
+  "configAppliedAt": null
+}
+```
 
 ### `GET /api/webhooks/ev12/events`
 Return recent ingested EV12 webhook events.

@@ -70,7 +70,7 @@ public class Ev12WebhookService {
 
     public synchronized List<Ev12WebhookEventResponse> recentEvents(Integer limit, String providedToken) {
         validateToken(providedToken);
-        int normalizedLimit = limit == null ? 200 : Math.max(1, limit);
+        int normalizedLimit = limit == null ? 200 : Math.max(1, Math.min(limit, 500));
         return ev12WebhookEventRepository.findAllByOrderByReceivedAtDesc(PageRequest.of(
             0,
             normalizedLimit,

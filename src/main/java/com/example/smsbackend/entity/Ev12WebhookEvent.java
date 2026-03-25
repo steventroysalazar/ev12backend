@@ -5,12 +5,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "ev12_webhook_events")
+@Table(
+    name = "ev12_webhook_events",
+    indexes = {
+        @Index(name = "idx_ev12_webhook_events_received_at", columnList = "receivedAt"),
+        @Index(name = "idx_ev12_webhook_events_device_id", columnList = "deviceId")
+    }
+)
 public class Ev12WebhookEvent {
 
     @Id

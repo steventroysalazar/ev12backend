@@ -10,6 +10,8 @@ public class UpdateDeviceRequest {
     private String phoneNumber;
     private String externalDeviceId;
     private Long userId;
+    private Long locationId;
+    private Boolean clearLocation;
     private DeviceProtocolSettings protocolSettings;
     private String alarmCode;
     private Instant alarmCancelledAt;
@@ -53,6 +55,14 @@ public class UpdateDeviceRequest {
         return userId;
     }
 
+    public Long locationId() {
+        return locationId;
+    }
+
+    public Boolean clearLocation() {
+        return clearLocation;
+    }
+
     public DeviceProtocolSettings protocolSettings() {
         return protocolSettings;
     }
@@ -89,6 +99,16 @@ public class UpdateDeviceRequest {
     @JsonAlias("user_id")
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    @JsonAlias("location_id")
+    public void setLocationId(Long locationId) {
+        this.locationId = locationId;
+    }
+
+    @JsonAlias("clear_location")
+    public void setClearLocation(Boolean clearLocation) {
+        this.clearLocation = clearLocation;
     }
 
     @JsonAlias("protocol_settings")

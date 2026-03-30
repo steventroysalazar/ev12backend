@@ -182,6 +182,18 @@ public class UserDeviceService {
             device.setUser(user);
         }
 
+        if (Boolean.TRUE.equals(request.clearLocation()) && request.locationId() != null) {
+            throw new IllegalArgumentException("Provide locationId or clearLocation=true, not both.");
+        }
+
+        if (Boolean.TRUE.equals(request.clearLocation())) {
+            device.getUser().setLocation(null);
+        } else if (request.locationId() != null) {
+            Location location = locationRepository.findById(request.locationId())
+                .orElseThrow(() -> new IllegalArgumentException("Location not found."));
+            device.getUser().setLocation(location);
+        }
+
         if (request.alarmCodeProvided()) {
             device.setAlarmCode(trimOrNull(request.alarmCode()));
         }

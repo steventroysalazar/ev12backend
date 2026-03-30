@@ -122,6 +122,48 @@ class UserDeviceServiceTest {
         assertEquals(1, response.protocolSettings().contacts().size());
     }
 
+    @Test
+    void updateDevice_updatesAssignedUsersLocation() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 7L);
+
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 3L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 9L);
+        device.setUser(user);
+
+        when(deviceRepository.findById(9L)).thenReturn(Optional.of(device));
+        when(locationRepository.findById(3L)).thenReturn(Optional.of(location));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDeviceRequest request = new UpdateDeviceRequest();
+        request.setLocationId(3L);
+
+        service.updateDevice(9L, request);
+
+        assertEquals(3L, device.getUser().getLocation().getId());
+    }
+
+    @Test
+    void updateDevice_rejectsLocationIdWhenClearLocationAlsoSet() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 7L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 9L);
+        device.setUser(user);
+
+        when(deviceRepository.findById(9L)).thenReturn(Optional.of(device));
+
+        UpdateDeviceRequest request = new UpdateDeviceRequest();
+        request.setLocationId(3L);
+        request.setClearLocation(true);
+
+        assertThrows(IllegalArgumentException.class, () -> service.updateDevice(9L, request));
+    }
+
 
     @Test
     void updateDevice_allowsAlarmCancelPayload() {

@@ -20,13 +20,16 @@ class DeviceLocationUpdateServiceTest {
     @Mock
     private DeviceRepository deviceRepository;
 
+    @Mock
+    private DeviceTelemetryLogService deviceTelemetryLogService;
+
     @Test
     void applyNowShouldPersistCoordinatesWhenDeviceExists() {
         Device device = new Device();
         device.setExternalDeviceId("862667084205114");
         when(deviceRepository.findByExternalDeviceId("862667084205114")).thenReturn(Optional.of(device));
 
-        DeviceLocationUpdateService service = new DeviceLocationUpdateService(deviceRepository);
+        DeviceLocationUpdateService service = new DeviceLocationUpdateService(deviceRepository, deviceTelemetryLogService);
         Instant updatedAt = Instant.parse("2026-03-25T12:48:17.268Z");
 
         service.applyNow("862667084205114", 15.1468038, 120.5463361, updatedAt);
@@ -39,7 +42,7 @@ class DeviceLocationUpdateServiceTest {
 
     @Test
     void applyNowShouldSkipWhenCoordinatesAreMissing() {
-        DeviceLocationUpdateService service = new DeviceLocationUpdateService(deviceRepository);
+        DeviceLocationUpdateService service = new DeviceLocationUpdateService(deviceRepository, deviceTelemetryLogService);
 
         service.applyNow("862667084205114", null, 120.5463361, Instant.now());
 

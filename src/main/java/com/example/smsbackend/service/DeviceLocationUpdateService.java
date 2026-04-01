@@ -15,9 +15,11 @@ public class DeviceLocationUpdateService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DeviceLocationUpdateService.class);
 
     private final DeviceRepository deviceRepository;
+    private final DeviceTelemetryLogService deviceTelemetryLogService;
 
-    public DeviceLocationUpdateService(DeviceRepository deviceRepository) {
+    public DeviceLocationUpdateService(DeviceRepository deviceRepository, DeviceTelemetryLogService deviceTelemetryLogService) {
         this.deviceRepository = deviceRepository;
+        this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     public void applyNow(String externalDeviceId, Double latitude, Double longitude, Instant updatedAt) {
@@ -31,10 +33,12 @@ public class DeviceLocationUpdateService {
             return;
         }
 
+        Instant eventTime = updatedAt == null ? Instant.now() : updatedAt;
         device.setLatitude(latitude);
         device.setLongitude(longitude);
-        device.setLocationUpdatedAt(updatedAt == null ? Instant.now() : updatedAt);
+        device.setLocationUpdatedAt(eventTime);
         deviceRepository.save(device);
+        deviceTelemetryLogService.logLocation(device, "WEBHOOK", latitude, longitude, eventTime, null);
     }
 
     private Device resolveDevice(String externalDeviceId) {

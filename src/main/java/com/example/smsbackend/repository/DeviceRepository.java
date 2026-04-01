@@ -13,4 +13,6 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     List<Device> findByUserLocationId(Long locationId);
 
     Optional<Device> findByExternalDeviceId(String externalDeviceId);
+
+    Optional<Device> findByPhoneNumber(String phoneNumber);
 }

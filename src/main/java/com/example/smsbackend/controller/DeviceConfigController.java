@@ -10,7 +10,9 @@ import com.example.smsbackend.dto.SendConfigResponse;
 import com.example.smsbackend.dto.SendMessageRequest;
 import com.example.smsbackend.dto.SentMessageResponse;
 import com.example.smsbackend.entity.Device;
+import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.service.DeviceCommandService;
+import com.example.smsbackend.service.DeviceTelemetryLogService;
 import com.example.smsbackend.service.GatewayClientService;
 import com.example.smsbackend.service.UserDeviceService;
 import jakarta.validation.Valid;
@@ -40,15 +42,21 @@ public class DeviceConfigController {
     private final UserDeviceService userDeviceService;
     private final DeviceCommandService deviceCommandService;
     private final GatewayClientService gatewayClientService;
+    private final DeviceRepository deviceRepository;
+    private final DeviceTelemetryLogService deviceTelemetryLogService;
 
     public DeviceConfigController(
         UserDeviceService userDeviceService,
         DeviceCommandService deviceCommandService,
-        GatewayClientService gatewayClientService
+        GatewayClientService gatewayClientService,
+        DeviceRepository deviceRepository,
+        DeviceTelemetryLogService deviceTelemetryLogService
     ) {
         this.userDeviceService = userDeviceService;
         this.deviceCommandService = deviceCommandService;
         this.gatewayClientService = gatewayClientService;
+        this.deviceRepository = deviceRepository;
+        this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     @PostMapping("/send-config")
@@ -156,6 +164,7 @@ public class DeviceConfigController {
         GatewayRequestOptions options = new GatewayRequestOptions(gatewayBaseUrl, resolvedToken);
 
         List<GatewayReplyMessage> replies = gatewayClientService.fetchMessages(phone, normalizedSince, limit, options);
+        replies.forEach(this::logSmsLocation);
 
         List<InboundMessageResponse> response = replies.stream().map(item -> new InboundMessageResponse(
             item.id(),
@@ -165,6 +174,21 @@ public class DeviceConfigController {
         )).toList();
 
         return ResponseEntity.ok(response);
+    }
+
+    private void logSmsLocation(GatewayReplyMessage message) {
+        if (message == null || !StringUtils.hasText(message.from()) || !StringUtils.hasText(message.message())) {
+            return;
+        }
+
+        deviceRepository.findByPhoneNumber(message.from().trim()).ifPresent(device ->
+            deviceTelemetryLogService.logLocationFromSms(
+                device,
+                message.id(),
+                message.message(),
+                Instant.ofEpochMilli(message.date())
+            )
+        );
     }
 
     private Long normalizeSince(Long since) {

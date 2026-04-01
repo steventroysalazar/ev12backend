@@ -701,3 +701,49 @@ Clear stored EV12 webhook history.
   1. `Authorization`
   2. `X-Gateway-Token`
   3. server config fallback
+
+### `GET /api/devices/{deviceId}/alarm-logs`
+Returns historical alarm log entries for one device (newest first).
+
+**What gets logged**
+- Alarm triggers from EV12 webhook (includes alarm code + snapshot coordinates if available).
+- Manual alarm cancellation via `PUT/PATCH /api/devices/{deviceId}` when `alarmCode` is cleared.
+
+**Response item**
+```json
+{
+  "id": 101,
+  "deviceId": 12,
+  "externalDeviceId": "862667084205114",
+  "alarmCode": "SOS Alert",
+  "action": "ALARM_TRIGGERED",
+  "source": "WEBHOOK",
+  "latitude": 15.1468038,
+  "longitude": 120.5463361,
+  "eventAt": "2026-04-01T12:00:00Z",
+  "note": "Alarm state updated from EV12 webhook"
+}
+```
+
+---
+
+### `GET /api/devices/{deviceId}/location-breadcrumbs`
+Returns location breadcrumb history for one device (newest first).
+
+**What gets logged**
+- Every coordinate update captured from EV12 webhook GPS payloads.
+- Coordinates parsed from inbound SMS messages (when the sender phone matches a device phone number).
+
+**Response item**
+```json
+{
+  "id": 301,
+  "deviceId": 12,
+  "externalDeviceId": "862667084205114",
+  "latitude": 15.1468038,
+  "longitude": 120.5463361,
+  "source": "WEBHOOK",
+  "capturedAt": "2026-04-01T12:00:00Z",
+  "gatewayMessageId": null
+}
+```

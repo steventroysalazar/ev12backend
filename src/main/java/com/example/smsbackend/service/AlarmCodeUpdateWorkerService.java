@@ -19,10 +19,16 @@ public class AlarmCodeUpdateWorkerService {
 
     private final DeviceRepository deviceRepository;
     private final AlarmStreamService alarmStreamService;
+    private final DeviceTelemetryLogService deviceTelemetryLogService;
 
-    public AlarmCodeUpdateWorkerService(DeviceRepository deviceRepository, AlarmStreamService alarmStreamService) {
+    public AlarmCodeUpdateWorkerService(
+        DeviceRepository deviceRepository,
+        AlarmStreamService alarmStreamService,
+        DeviceTelemetryLogService deviceTelemetryLogService
+    ) {
         this.deviceRepository = deviceRepository;
         this.alarmStreamService = alarmStreamService;
+        this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     public AlarmCodeUpdateResult applyNow(AlarmCodeUpdateRequest request) {
@@ -79,6 +85,14 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getAlarmCode()
         );
         Instant updatedAt = request.updatedAt() == null ? Instant.now() : request.updatedAt();
+        deviceTelemetryLogService.logAlarmEvent(
+            savedDevice,
+            "ALARM_TRIGGERED",
+            "WEBHOOK",
+            savedDevice.getAlarmCode(),
+            updatedAt,
+            "Alarm state updated from EV12 webhook"
+        );
         alarmStreamService.publish(new AlarmUpdateEventResponse(
             savedDevice.getId(),
             savedDevice.getExternalDeviceId(),

@@ -1,6 +1,8 @@
 package com.example.smsbackend.controller;
 
 import com.example.smsbackend.dto.CreateDeviceForUserRequest;
+import com.example.smsbackend.dto.DeviceAlarmLogResponse;
+import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.CreateDeviceRequest;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
@@ -91,6 +93,17 @@ public class UserController {
     public ResponseEntity<List<DeviceResponse>> listDevices() {
         return ResponseEntity.ok(userDeviceService.listAllDevices());
     }
+
+    @GetMapping("/devices/{deviceId}/alarm-logs")
+    public ResponseEntity<List<DeviceAlarmLogResponse>> listDeviceAlarmLogs(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.listDeviceAlarmLogs(deviceId));
+    }
+
+    @GetMapping("/devices/{deviceId}/location-breadcrumbs")
+    public ResponseEntity<List<DeviceLocationBreadcrumbResponse>> listDeviceLocationBreadcrumbs(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.listDeviceLocationBreadcrumbs(deviceId));
+    }
+
     @GetMapping("/users/{userId}/devices")
     public ResponseEntity<List<DeviceResponse>> listUserDevices(@PathVariable Long userId) {
         List<DeviceResponse> response = userDeviceService.listUserDevices(userId);

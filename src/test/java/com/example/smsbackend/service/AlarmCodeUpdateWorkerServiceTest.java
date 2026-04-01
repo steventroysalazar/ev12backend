@@ -26,6 +26,9 @@ class AlarmCodeUpdateWorkerServiceTest {
     @Mock
     private AlarmStreamService alarmStreamService;
 
+    @Mock
+    private DeviceTelemetryLogService deviceTelemetryLogService;
+
     @Test
     void processShouldUpdateAlarmCodeAndPublishEvent() {
         Device device = new Device();
@@ -33,7 +36,7 @@ class AlarmCodeUpdateWorkerServiceTest {
         when(deviceRepository.findByExternalDeviceId("dev-01")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
         service.process(new AlarmCodeUpdateRequest("dev-01", "SOS Alert", Instant.now()));
 
         assertEquals("SOS Alert", device.getAlarmCode());
@@ -49,7 +52,7 @@ class AlarmCodeUpdateWorkerServiceTest {
         when(deviceRepository.findByExternalDeviceId("dev-01")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
         service.process(new AlarmCodeUpdateRequest("dev-01", null, Instant.now()));
 
         assertNull(device.getAlarmCode());
@@ -66,7 +69,7 @@ class AlarmCodeUpdateWorkerServiceTest {
 
         when(deviceRepository.findByExternalDeviceId("dev-01")).thenReturn(Optional.of(device));
 
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
         service.process(new AlarmCodeUpdateRequest("dev-01", "SOS Alert", Instant.parse("2026-03-22T22:00:00Z")));
 
         assertNull(device.getAlarmCode());
@@ -83,7 +86,7 @@ class AlarmCodeUpdateWorkerServiceTest {
         when(deviceRepository.findByExternalDeviceId("dev-01")).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
         service.process(new AlarmCodeUpdateRequest("dev-01", "SOS Alert", Instant.parse("2026-03-22T22:00:01Z")));
 
         assertEquals("SOS Alert", device.getAlarmCode());
@@ -95,7 +98,7 @@ class AlarmCodeUpdateWorkerServiceTest {
     void processShouldSkipWhenNoDeviceFound() {
         when(deviceRepository.findByExternalDeviceId("missing")).thenReturn(Optional.empty());
         when(deviceRepository.findAll()).thenReturn(List.of());
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
 
         service.process(new AlarmCodeUpdateRequest("missing", "SOS Alert", Instant.now()));
 
@@ -112,7 +115,7 @@ class AlarmCodeUpdateWorkerServiceTest {
         when(deviceRepository.findAll()).thenReturn(List.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService);
+        AlarmCodeUpdateWorkerService service = new AlarmCodeUpdateWorkerService(deviceRepository, alarmStreamService, deviceTelemetryLogService);
         service.process(new AlarmCodeUpdateRequest("862667084205114", "SOS Alert", Instant.now()));
 
         assertEquals("SOS Alert", device.getAlarmCode());

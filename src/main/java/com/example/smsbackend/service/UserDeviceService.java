@@ -1,6 +1,8 @@
 package com.example.smsbackend.service;
 
 import com.example.smsbackend.dto.CreateDeviceRequest;
+import com.example.smsbackend.dto.DeviceAlarmLogResponse;
+import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
@@ -38,17 +40,20 @@ public class UserDeviceService {
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
     private final ObjectMapper objectMapper;
+    private final DeviceTelemetryLogService deviceTelemetryLogService;
 
     public UserDeviceService(
         AppUserRepository appUserRepository,
         DeviceRepository deviceRepository,
         LocationRepository locationRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        DeviceTelemetryLogService deviceTelemetryLogService
     ) {
         this.appUserRepository = appUserRepository;
         this.deviceRepository = deviceRepository;
         this.locationRepository = locationRepository;
         this.objectMapper = objectMapper;
+        this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     @Transactional(readOnly = true)
@@ -195,7 +200,22 @@ public class UserDeviceService {
         }
 
         if (request.alarmCodeProvided()) {
-            device.setAlarmCode(trimOrNull(request.alarmCode()));
+            String nextAlarmCode = trimOrNull(request.alarmCode());
+            if (nextAlarmCode == null && device.getAlarmCode() != null) {
+                Instant cancelledAt = request.alarmCancelledAtProvided() && request.alarmCancelledAt() != null
+                    ? request.alarmCancelledAt()
+                    : Instant.now();
+                device.setAlarmCancelledAt(cancelledAt);
+                deviceTelemetryLogService.logAlarmEvent(
+                    device,
+                    "ALARM_CANCELLED",
+                    "MANUAL",
+                    null,
+                    cancelledAt,
+                    "Alarm cancelled from device update API"
+                );
+            }
+            device.setAlarmCode(nextAlarmCode);
         }
 
         if (request.alarmCancelledAtProvided()) {
@@ -204,6 +224,18 @@ public class UserDeviceService {
 
         Device saved = deviceRepository.save(device);
         return toDeviceResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeviceAlarmLogResponse> listDeviceAlarmLogs(Long deviceId) {
+        getDevice(deviceId);
+        return deviceTelemetryLogService.listAlarmLogs(deviceId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeviceLocationBreadcrumbResponse> listDeviceLocationBreadcrumbs(Long deviceId) {
+        getDevice(deviceId);
+        return deviceTelemetryLogService.listLocationBreadcrumbs(deviceId);
     }
 
     @Transactional(readOnly = true)
@@ -268,6 +300,9 @@ public class UserDeviceService {
             device.getExternalDeviceId(),
             device.getAlarmCode(),
             device.getAlarmCancelledAt(),
+            device.getLastPowerOnAt(),
+            device.getLastPowerOffAt(),
+            device.getLastDisconnectedAt(),
             device.getLatitude(),
             device.getLongitude(),
             device.getLocationUpdatedAt(),

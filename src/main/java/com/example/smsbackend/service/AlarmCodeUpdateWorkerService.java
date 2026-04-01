@@ -19,10 +19,16 @@ public class AlarmCodeUpdateWorkerService {
 
     private final DeviceRepository deviceRepository;
     private final AlarmStreamService alarmStreamService;
+    private final DeviceTelemetryLogService deviceTelemetryLogService;
 
-    public AlarmCodeUpdateWorkerService(DeviceRepository deviceRepository, AlarmStreamService alarmStreamService) {
+    public AlarmCodeUpdateWorkerService(
+        DeviceRepository deviceRepository,
+        AlarmStreamService alarmStreamService,
+        DeviceTelemetryLogService deviceTelemetryLogService
+    ) {
         this.deviceRepository = deviceRepository;
         this.alarmStreamService = alarmStreamService;
+        this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     public AlarmCodeUpdateResult applyNow(AlarmCodeUpdateRequest request) {
@@ -42,6 +48,64 @@ public class AlarmCodeUpdateWorkerService {
             LOGGER.warn("Unable to process alarm update request.", exception);
             return AlarmCodeUpdateResult.ignored("processing error: " + exception.getClass().getSimpleName());
         }
+    }
+
+    public void recordPowerLifecycleEvent(String externalDeviceId, String alarmCode, Instant eventTimestamp) {
+        if (!StringUtils.hasText(externalDeviceId) || !StringUtils.hasText(alarmCode)) {
+            return;
+        }
+        Device device = resolveDevice(externalDeviceId);
+        if (device == null) {
+            return;
+        }
+
+        Instant eventAt = eventTimestamp == null ? Instant.now() : eventTimestamp;
+        String normalized = alarmCode.toLowerCase();
+        if (normalized.contains("power on")) {
+            device.setLastPowerOnAt(eventAt);
+            deviceTelemetryLogService.logAlarmEvent(
+                device,
+                "POWER_ON",
+                "WEBHOOK",
+                alarmCode,
+                eventAt,
+                "Power on alarm received from EV12 webhook"
+            );
+        } else if (normalized.contains("power off")) {
+            device.setLastPowerOffAt(eventAt);
+            deviceTelemetryLogService.logAlarmEvent(
+                device,
+                "POWER_OFF",
+                "WEBHOOK",
+                alarmCode,
+                eventAt,
+                "Power off alarm received from EV12 webhook"
+            );
+        } else {
+            return;
+        }
+        deviceRepository.save(device);
+    }
+
+    public void recordDisconnectedStatus(String externalDeviceId, Instant eventTimestamp) {
+        if (!StringUtils.hasText(externalDeviceId)) {
+            return;
+        }
+        Device device = resolveDevice(externalDeviceId);
+        if (device == null) {
+            return;
+        }
+        Instant eventAt = eventTimestamp == null ? Instant.now() : eventTimestamp;
+        device.setLastDisconnectedAt(eventAt);
+        deviceRepository.save(device);
+        deviceTelemetryLogService.logAlarmEvent(
+            device,
+            "DEVICE_DISCONNECTED",
+            "WEBHOOK",
+            null,
+            eventAt,
+            "Device disconnected status received from EV12 webhook"
+        );
     }
 
     AlarmCodeUpdateResult process(AlarmCodeUpdateRequest request) {
@@ -79,6 +143,14 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getAlarmCode()
         );
         Instant updatedAt = request.updatedAt() == null ? Instant.now() : request.updatedAt();
+        deviceTelemetryLogService.logAlarmEvent(
+            savedDevice,
+            "ALARM_TRIGGERED",
+            "WEBHOOK",
+            savedDevice.getAlarmCode(),
+            updatedAt,
+            "Alarm state updated from EV12 webhook"
+        );
         alarmStreamService.publish(new AlarmUpdateEventResponse(
             savedDevice.getId(),
             savedDevice.getExternalDeviceId(),

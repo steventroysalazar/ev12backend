@@ -195,6 +195,10 @@ Update device fields (partial update behavior).
   - `latitude`: last known latitude from webhook `GPS Location`
   - `longitude`: last known longitude from webhook `GPS Location`
   - `locationUpdatedAt`: UTC timestamp when coordinates were last updated
+- Device responses include EV lifecycle timestamps for battery/power diagnostics:
+  - `lastPowerOnAt`: last webhook timestamp where alarm code matched power-on alert
+  - `lastPowerOffAt`: last webhook timestamp where alarm code matched power-off alert
+  - `lastDisconnectedAt`: last webhook timestamp where status was disconnected / `ECONNRESET`
 - Device responses now include config queue tracking fields:
   - `configStatus`: `IDLE`, `PENDING`, `APPLIED`
   - `configLastSentAt`: UTC timestamp of the last configuration SMS send
@@ -636,6 +640,9 @@ Ingest EV12 webhook payload in any content type.
   "externalDeviceId": "862667084205114",
   "alarmCode": "Fall-Down Alert",
   "alarmCancelledAt": null,
+  "lastPowerOnAt": "2026-03-26T02:01:10Z",
+  "lastPowerOffAt": null,
+  "lastDisconnectedAt": "2026-03-26T01:58:45.121Z",
   "latitude": 15.1468038,
   "longitude": 120.5463361,
   "locationUpdatedAt": "2026-03-25T12:48:17.268Z",

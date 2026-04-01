@@ -50,6 +50,64 @@ public class AlarmCodeUpdateWorkerService {
         }
     }
 
+    public void recordPowerLifecycleEvent(String externalDeviceId, String alarmCode, Instant eventTimestamp) {
+        if (!StringUtils.hasText(externalDeviceId) || !StringUtils.hasText(alarmCode)) {
+            return;
+        }
+        Device device = resolveDevice(externalDeviceId);
+        if (device == null) {
+            return;
+        }
+
+        Instant eventAt = eventTimestamp == null ? Instant.now() : eventTimestamp;
+        String normalized = alarmCode.toLowerCase();
+        if (normalized.contains("power on")) {
+            device.setLastPowerOnAt(eventAt);
+            deviceTelemetryLogService.logAlarmEvent(
+                device,
+                "POWER_ON",
+                "WEBHOOK",
+                alarmCode,
+                eventAt,
+                "Power on alarm received from EV12 webhook"
+            );
+        } else if (normalized.contains("power off")) {
+            device.setLastPowerOffAt(eventAt);
+            deviceTelemetryLogService.logAlarmEvent(
+                device,
+                "POWER_OFF",
+                "WEBHOOK",
+                alarmCode,
+                eventAt,
+                "Power off alarm received from EV12 webhook"
+            );
+        } else {
+            return;
+        }
+        deviceRepository.save(device);
+    }
+
+    public void recordDisconnectedStatus(String externalDeviceId, Instant eventTimestamp) {
+        if (!StringUtils.hasText(externalDeviceId)) {
+            return;
+        }
+        Device device = resolveDevice(externalDeviceId);
+        if (device == null) {
+            return;
+        }
+        Instant eventAt = eventTimestamp == null ? Instant.now() : eventTimestamp;
+        device.setLastDisconnectedAt(eventAt);
+        deviceRepository.save(device);
+        deviceTelemetryLogService.logAlarmEvent(
+            device,
+            "DEVICE_DISCONNECTED",
+            "WEBHOOK",
+            null,
+            eventAt,
+            "Device disconnected status received from EV12 webhook"
+        );
+    }
+
     AlarmCodeUpdateResult process(AlarmCodeUpdateRequest request) {
         Device device = resolveDevice(request.externalDeviceId());
         if (device == null) {

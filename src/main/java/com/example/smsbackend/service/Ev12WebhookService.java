@@ -219,6 +219,21 @@ public class Ev12WebhookService {
                 }
 
                 JsonNode alarmCodeNode = extractAlarmCodeNode(candidatePayload);
+                if (!alarmCodeNode.isMissingNode() && !alarmCodeNode.isNull()) {
+                    String powerLifecycleCode = derivePowerLifecycleCode(alarmCodeNode);
+                    if (powerLifecycleCode != null) {
+                        alarmCodeUpdateWorkerService.recordPowerLifecycleEvent(
+                            externalDeviceId.trim(),
+                            powerLifecycleCode,
+                            eventTimestamp
+                        );
+                    }
+                }
+
+                if (isDisconnectedStatus(candidatePayload)) {
+                    alarmCodeUpdateWorkerService.recordDisconnectedStatus(externalDeviceId.trim(), eventTimestamp);
+                }
+
                 if (alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
                     alarmAttempts.add(new WebhookAlarmAttemptResponse(
                         candidateIndex++,
@@ -487,6 +502,16 @@ public class Ev12WebhookService {
         return latestMatch;
     }
 
+    private String derivePowerLifecycleCode(JsonNode alarmCodeNode) {
+        String latestMatch = null;
+        for (String alarmCodeValue : alarmCodeValues(alarmCodeNode)) {
+            if (isPowerOnLike(alarmCodeValue) || isPowerOffLike(alarmCodeValue)) {
+                latestMatch = alarmCodeValue;
+            }
+        }
+        return latestMatch;
+    }
+
     private List<String> alarmCodeValues(JsonNode alarmCodeNode) {
         List<String> values = new ArrayList<>();
         if (alarmCodeNode == null || alarmCodeNode.isMissingNode() || alarmCodeNode.isNull()) {
@@ -534,6 +559,33 @@ public class Ev12WebhookService {
             return false;
         }
         return value.toLowerCase(Locale.ROOT).contains("fall");
+    }
+
+    private boolean isPowerOnLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains("power on");
+    }
+
+    private boolean isPowerOffLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains("power off");
+    }
+
+    private boolean isDisconnectedStatus(JsonNode root) {
+        String command = normalizeAlarmCodeValue(root.path("command").asText(null));
+        if ("ECONNRESET".equalsIgnoreCase(String.valueOf(command))) {
+            return true;
+        }
+
+        JsonNode data = firstPresentNode(root, "data", "Data");
+        String topStatus = normalizeAlarmCodeValue(root.path("status").asText(null));
+        String nestedStatus = normalizeAlarmCodeValue(data.path("status").asText(null));
+        return "disconnected".equalsIgnoreCase(String.valueOf(topStatus))
+            || "disconnected".equalsIgnoreCase(String.valueOf(nestedStatus));
     }
 
     private Instant extractEventTimestamp(JsonNode root) {

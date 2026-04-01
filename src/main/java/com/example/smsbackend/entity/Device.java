@@ -35,6 +35,15 @@ public class Device {
     @Column(name = "alarm_cancelled_at")
     private Instant alarmCancelledAt;
 
+    @Column(name = "last_power_on_at")
+    private Instant lastPowerOnAt;
+
+    @Column(name = "last_power_off_at")
+    private Instant lastPowerOffAt;
+
+    @Column(name = "last_disconnected_at")
+    private Instant lastDisconnectedAt;
+
     @Column(name = "latitude")
     private Double latitude;
 
@@ -107,6 +116,30 @@ public class Device {
 
     public void setAlarmCancelledAt(Instant alarmCancelledAt) {
         this.alarmCancelledAt = alarmCancelledAt;
+    }
+
+    public Instant getLastPowerOnAt() {
+        return lastPowerOnAt;
+    }
+
+    public void setLastPowerOnAt(Instant lastPowerOnAt) {
+        this.lastPowerOnAt = lastPowerOnAt;
+    }
+
+    public Instant getLastPowerOffAt() {
+        return lastPowerOffAt;
+    }
+
+    public void setLastPowerOffAt(Instant lastPowerOffAt) {
+        this.lastPowerOffAt = lastPowerOffAt;
+    }
+
+    public Instant getLastDisconnectedAt() {
+        return lastDisconnectedAt;
+    }
+
+    public void setLastDisconnectedAt(Instant lastDisconnectedAt) {
+        this.lastDisconnectedAt = lastDisconnectedAt;
     }
 
     public Double getLatitude() {

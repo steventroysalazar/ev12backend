@@ -224,6 +224,45 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
+    void ingestShouldLogPowerOnFromAlarmCode() {
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(dbProperties(null));
+
+        service.ingest(
+            ("{\"deviceId\":\"863829079965453\",\"timestamp\":1774490470073,\"data\":{\"Alarm Code\":[\"Power ON Alert\"]}}")
+                .getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService, times(1)).recordPowerLifecycleEvent(
+            "863829079965453",
+            "Power ON Alert",
+            Instant.ofEpochMilli(1774490470073L)
+        );
+    }
+
+    @Test
+    void ingestShouldLogDisconnectedStatusFromWebhook() {
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(dbProperties(null));
+
+        service.ingest(
+            ("{\"deviceId\":\"863829079965453\",\"command\":\"ECONNRESET\",\"timestamp\":1774490325121,\"data\":{\"status\":\"disconnected\"}}")
+                .getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService, times(1)).recordDisconnectedStatus(
+            "863829079965453",
+            Instant.ofEpochMilli(1774490325121L)
+        );
+    }
+
+    @Test
     void ingestShouldKeepHistoryInMemoryWhenPersistenceDisabled() {
         mockApplyNowSuccess();
         Ev12WebhookService service = createService(new WebhookProperties(null, false, 1000));

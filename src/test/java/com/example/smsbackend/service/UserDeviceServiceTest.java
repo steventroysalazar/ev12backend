@@ -106,7 +106,6 @@ class UserDeviceServiceTest {
         user.setRole(UserRole.USER);
         user.setManager(manager);
         user.setLocation(location);
-        user.setDevices(List.of());
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
 

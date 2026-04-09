@@ -68,8 +68,9 @@ public class DeviceConfigController {
     ) {
         Device device = userDeviceService.getDevice(request.deviceId());
         userDeviceService.saveDeviceProtocolSettings(device, request.toDeviceProtocolSettings());
-        List<String> commands = deviceCommandService.buildCommands(request);
-        String commandPreview = deviceCommandService.buildPreview(commands);
+        String commandPreview = StringUtils.hasText(request.command())
+            ? request.command().trim()
+            : deviceCommandService.buildPreview(deviceCommandService.buildCommands(request));
         List<String> smsBodies = deviceCommandService.splitForSms(commandPreview);
 
         String resolvedToken = gatewayToken != null && !gatewayToken.isBlank() ? gatewayToken : legacyGatewayToken;

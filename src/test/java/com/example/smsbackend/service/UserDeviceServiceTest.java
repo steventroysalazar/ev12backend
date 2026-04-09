@@ -20,6 +20,7 @@ import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +85,39 @@ class UserDeviceServiceTest {
         assertEquals(1L, response.id());
         assertEquals(3L, response.locationId());
         assertEquals(2L, response.managerId());
+    }
+
+    @Test
+    void getUserById_returnsUserDetails() {
+        AppUser manager = new AppUser();
+        ReflectionTestUtils.setField(manager, "id", 2L);
+
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 3L);
+        location.setName("HQ");
+
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 1L);
+        user.setEmail("user@example.com");
+        user.setFirstName("User");
+        user.setLastName("Name");
+        user.setContactNumber("+15551234567");
+        user.setAddress("123 Main");
+        user.setRole(UserRole.USER);
+        user.setManager(manager);
+        user.setLocation(location);
+        user.setDevices(List.of());
+
+        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        var response = service.getUserById(1L);
+
+        assertEquals(1L, response.id());
+        assertEquals("user@example.com", response.email());
+        assertEquals("User", response.firstName());
+        assertEquals("Name", response.lastName());
+        assertEquals(2L, response.managerId());
+        assertEquals(3L, response.locationId());
     }
 
     @Test

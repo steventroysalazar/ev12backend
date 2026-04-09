@@ -281,6 +281,32 @@ class Ev12WebhookServiceTest {
     }
 
     @Test
+    void ingestShouldAutoPushMotionAndNoMotionAlerts() {
+        mockApplyNowSuccess();
+        mockSaveWebhookEvent();
+        Ev12WebhookService service = createService(dbProperties(null));
+
+        service.ingest(
+            ("[" +
+                "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"Motion Alert\"]}}," +
+                "{\"deviceId\":\"862667084205114\",\"data\":{\"Alarm Code\":[\"No-Motion Alert\"]}}" +
+            "]").getBytes(),
+            "application/json",
+            null,
+            Map.of()
+        );
+
+        verify(alarmCodeUpdateWorkerService, times(1)).applyNow(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId())
+                && "Motion Alert".equals(request.alarmCode())
+        ));
+        verify(alarmCodeUpdateWorkerService, times(1)).applyNow(argThat(request ->
+            "862667084205114".equals(request.externalDeviceId())
+                && "No-Motion Alert".equals(request.alarmCode())
+        ));
+    }
+
+    @Test
     void clearEventsShouldClearInMemoryHistoryWhenPersistenceDisabled() {
         mockApplyNowSuccess();
         Ev12WebhookService service = createService(new WebhookProperties(null, false, 2));

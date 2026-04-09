@@ -254,7 +254,7 @@ public class Ev12WebhookService {
                         null,
                         null,
                         "ignored",
-                        "alarm code does not contain sos/fall"
+                        "alarm code does not contain supported trigger"
                     ));
                     continue;
                 }
@@ -495,7 +495,7 @@ public class Ev12WebhookService {
     private String deriveAlarmCode(JsonNode alarmCodeNode) {
         String latestMatch = null;
         for (String alarmCodeValue : alarmCodeValues(alarmCodeNode)) {
-            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue)) {
+            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue) || isMotionLike(alarmCodeValue)) {
                 latestMatch = alarmCodeValue;
             }
         }
@@ -559,6 +559,15 @@ public class Ev12WebhookService {
             return false;
         }
         return value.toLowerCase(Locale.ROOT).contains("fall");
+    }
+
+    private boolean isMotionLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        return normalized.contains("motion alert")
+            || normalized.contains("no-motion alert");
     }
 
     private boolean isPowerOnLike(String value) {

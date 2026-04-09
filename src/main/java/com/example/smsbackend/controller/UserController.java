@@ -42,6 +42,10 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<UserResponse> getUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(userDeviceService.getUserById(userId));
+    }
 
     @PutMapping("/users/{userId}")
     public ResponseEntity<UserResponse> updateUser(

@@ -7,6 +7,7 @@ import org.springframework.util.StringUtils;
 
 public record SendConfigRequest(
     @NotNull Long deviceId,
+    String command,
     String imei,
     String eviewVersion,
     List<DeviceContactSettings> contacts,

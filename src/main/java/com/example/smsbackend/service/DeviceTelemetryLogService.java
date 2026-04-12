@@ -1,5 +1,6 @@
 package com.example.smsbackend.service;
 
+import com.example.smsbackend.dto.AlertLogFiltersResponse;
 import com.example.smsbackend.dto.DeviceAlarmLogResponse;
 import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.entity.Device;
@@ -7,6 +8,7 @@ import com.example.smsbackend.entity.DeviceAlarmLog;
 import com.example.smsbackend.entity.DeviceLocationBreadcrumb;
 import com.example.smsbackend.repository.DeviceAlarmLogRepository;
 import com.example.smsbackend.repository.DeviceLocationBreadcrumbRepository;
+import com.example.smsbackend.repository.DeviceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -20,13 +22,16 @@ public class DeviceTelemetryLogService {
 
     private final DeviceAlarmLogRepository deviceAlarmLogRepository;
     private final DeviceLocationBreadcrumbRepository deviceLocationBreadcrumbRepository;
+    private final DeviceRepository deviceRepository;
 
     public DeviceTelemetryLogService(
         DeviceAlarmLogRepository deviceAlarmLogRepository,
-        DeviceLocationBreadcrumbRepository deviceLocationBreadcrumbRepository
+        DeviceLocationBreadcrumbRepository deviceLocationBreadcrumbRepository,
+        DeviceRepository deviceRepository
     ) {
         this.deviceAlarmLogRepository = deviceAlarmLogRepository;
         this.deviceLocationBreadcrumbRepository = deviceLocationBreadcrumbRepository;
+        this.deviceRepository = deviceRepository;
     }
 
     public void logAlarmEvent(Device device, String action, String source, String alarmCode, Instant eventAt, String note) {
@@ -74,6 +79,18 @@ public class DeviceTelemetryLogService {
                 return;
             }
         }
+    }
+
+    public List<String> listActiveAlertsLookup() {
+        return deviceRepository.findDistinctActiveAlarmCodes();
+    }
+
+    public AlertLogFiltersResponse listAlertLogFiltersLookup() {
+        return new AlertLogFiltersResponse(
+            deviceAlarmLogRepository.findDistinctAlarmCodes(),
+            deviceAlarmLogRepository.findDistinctActions(),
+            deviceAlarmLogRepository.findDistinctSources()
+        );
     }
 
     public List<DeviceAlarmLogResponse> listAlarmLogs(Long deviceId) {

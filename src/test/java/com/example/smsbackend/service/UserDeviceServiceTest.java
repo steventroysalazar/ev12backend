@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -117,6 +118,84 @@ class UserDeviceServiceTest {
         assertEquals("Name", response.lastName());
         assertEquals(2L, response.managerId());
         assertEquals(3L, response.locationId());
+    }
+
+
+    @Test
+    void listManagersLookup_returnsOnlyRole2Users() {
+        AppUser manager = new AppUser();
+        ReflectionTestUtils.setField(manager, "id", 2L);
+        manager.setFirstName("Maya");
+        manager.setLastName("Stone");
+        manager.setEmail("maya@example.com");
+        manager.setRole(UserRole.MANAGER);
+
+        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.MANAGER))
+            .thenReturn(List.of(manager));
+
+        var response = service.listManagersLookup();
+
+        assertEquals(1, response.size());
+        assertEquals(2L, response.get(0).id());
+        assertEquals(2, response.get(0).userRole());
+        verify(appUserRepository).findByRoleOrderByFirstNameAscLastNameAsc(UserRole.MANAGER);
+    }
+
+    @Test
+    void listRoleUsersLookup_returnsOnlyRole3Users() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 3L);
+        user.setFirstName("Uma");
+        user.setLastName("Ray");
+        user.setEmail("uma@example.com");
+        user.setRole(UserRole.USER);
+
+        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.USER))
+            .thenReturn(List.of(user));
+
+        var response = service.listRoleUsersLookup();
+
+        assertEquals(1, response.size());
+        assertEquals(3, response.get(0).userRole());
+    }
+
+
+    @Test
+    void listUsersLookupByLocation_returnsLocationUsers() {
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 11L);
+
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 21L);
+        user.setFirstName("Ari");
+        user.setLastName("Lane");
+        user.setEmail("ari@example.com");
+        user.setRole(UserRole.USER);
+        user.setLocation(location);
+
+        when(locationRepository.existsById(11L)).thenReturn(true);
+        when(appUserRepository.findByLocationIdOrderByFirstNameAscLastNameAsc(11L)).thenReturn(List.of(user));
+
+        var response = service.listUsersLookupByLocation(11L);
+
+        assertEquals(1, response.size());
+        assertEquals(21L, response.get(0).id());
+        assertEquals(3, response.get(0).userRole());
+    }
+
+    @Test
+    void listLocationsLookup_returnsSortedLocationLookupItems() {
+        Location hq = new Location();
+        ReflectionTestUtils.setField(hq, "id", 10L);
+        hq.setName("HQ");
+
+        when(locationRepository.findAllByOrderByNameAsc()).thenReturn(List.of(hq));
+
+        var response = service.listLocationsLookup();
+
+        assertEquals(1, response.size());
+        assertEquals(10L, response.get(0).id());
+        assertEquals("HQ", response.get(0).name());
     }
 
     @Test

@@ -5,7 +5,9 @@ import com.example.smsbackend.dto.DeviceAlarmLogResponse;
 import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
+import com.example.smsbackend.dto.LocationLookupResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
+import com.example.smsbackend.dto.UserLookupResponse;
 import com.example.smsbackend.dto.UpdateUserRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
@@ -54,6 +56,44 @@ public class UserDeviceService {
         this.locationRepository = locationRepository;
         this.objectMapper = objectMapper;
         this.deviceTelemetryLogService = deviceTelemetryLogService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserLookupResponse> listManagersLookup() {
+        return listUsersLookupByRole(UserRole.MANAGER);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserLookupResponse> listRoleUsersLookup() {
+        return listUsersLookupByRole(UserRole.USER);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserLookupResponse> listSuperAdminsLookup() {
+        return listUsersLookupByRole(UserRole.SUPER_ADMIN);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserLookupResponse> listUsersLookupByLocation(Long locationId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new IllegalArgumentException("Location not found.");
+        }
+        return appUserRepository.findByLocationIdOrderByFirstNameAscLastNameAsc(locationId).stream()
+            .map(user -> new UserLookupResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                user.getRole().getCode()
+            ))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LocationLookupResponse> listLocationsLookup() {
+        return locationRepository.findAllByOrderByNameAsc().stream()
+            .map(location -> new LocationLookupResponse(location.getId(), location.getName()))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -280,6 +320,18 @@ public class UserDeviceService {
     public Device getDevice(Long deviceId) {
         return deviceRepository.findById(deviceId)
             .orElseThrow(() -> new IllegalArgumentException("Device not found."));
+    }
+
+    private List<UserLookupResponse> listUsersLookupByRole(UserRole role) {
+        return appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(role).stream()
+            .map(user -> new UserLookupResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                user.getRole().getCode()
+            ))
+            .toList();
     }
 
     private UserRole mapRole(Integer code) {

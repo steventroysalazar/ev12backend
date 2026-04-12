@@ -113,6 +113,158 @@ Update user fields (partial update behavior).
 
 ---
 
+
+## Lookup APIs (lightweight dropdown/filter data)
+
+These endpoints return compact records for frontend filter controls and select inputs, so you do not need to fetch full `/api/users` payloads.
+
+### `GET /api/lookups/managers`
+Returns only users with role `2` (MANAGER).
+
+**Example response**
+```json
+[
+  {
+    "id": 7,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john@example.com",
+    "userRole": 2
+  }
+]
+```
+
+---
+
+### `GET /api/lookups/users`
+Returns only users with role `3` (USER).
+
+---
+
+### `GET /api/lookups/super-admins`
+Returns only users with role `1` (SUPER_ADMIN).
+
+---
+
+### `GET /api/lookups/locations`
+Returns lightweight location list for location selectors.
+
+**Example response**
+```json
+[
+  {
+    "id": 4,
+    "name": "East Warehouse"
+  }
+]
+```
+
+---
+
+### `GET /api/lookups/locations/{locationId}/users`
+Returns lightweight users assigned to a specific location.
+
+**Path params**
+- `locationId` (required)
+
+**Example response**
+```json
+[
+  {
+    "id": 21,
+    "firstName": "Ari",
+    "lastName": "Lane",
+    "email": "ari@example.com",
+    "userRole": 3
+  }
+]
+```
+
+---
+
+### `GET /api/lookups/alerts`
+Returns distinct active device alarm codes (`devices.alarmCode`) for current alert filtering.
+
+**Example response**
+```json
+[
+  "Fall-Down Alert",
+  "SOS Alert"
+]
+```
+
+---
+
+### `GET /api/lookups/alert-logs`
+Returns distinct values from alert logs for log filter controls.
+
+**Example response**
+```json
+{
+  "alarmCodes": ["Fall-Down Alert", "SOS Alert"],
+  "actions": ["ALARM_CANCELLED", "ALARM_TRIGGERED"],
+  "sources": ["MANUAL", "WEBHOOK"]
+}
+```
+
+---
+
+### Frontend feed examples for the new lookup endpoints
+
+```ts
+// Example: hydrate filter dropdowns in parallel
+const locationId = 11;
+const [managers, usersRole3, superAdmins, locations, locationUsers, alerts, alertLogFilters] = await Promise.all([
+  api.get('/api/lookups/managers').then(r => r.data),
+  api.get('/api/lookups/users').then(r => r.data),
+  api.get('/api/lookups/super-admins').then(r => r.data),
+  api.get('/api/lookups/locations').then(r => r.data),
+  api.get(`/api/lookups/locations/${locationId}/users`).then(r => r.data),
+  api.get('/api/lookups/alerts').then(r => r.data),
+  api.get('/api/lookups/alert-logs').then(r => r.data)
+]);
+
+// managers/usersRole3/superAdmins item shape:
+// { id, firstName, lastName, email, userRole }
+
+// locations item shape:
+// { id, name }
+
+// locationUsers item shape:
+// { id, firstName, lastName, email, userRole }
+
+// alerts item shape:
+// string[]
+
+// alertLogFilters shape:
+// { alarmCodes: string[], actions: string[], sources: string[] }
+```
+
+```ts
+// Example: convert lookup payload into <Select /> options
+const managerOptions = managers.map((m: any) => ({
+  value: m.id,
+  label: `${m.firstName} ${m.lastName} (${m.email})`
+}));
+
+const locationOptions = locations.map((loc: any) => ({
+  value: loc.id,
+  label: loc.name
+}));
+
+const alertOptions = alerts.map((code: string) => ({
+  value: code,
+  label: code
+}));
+
+const alertLogActionOptions = alertLogFilters.actions.map((action: string) => ({
+  value: action,
+  label: action
+}));
+```
+
+---
+
 ## Device APIs
 
 ### `POST /api/users/{userId}/devices`

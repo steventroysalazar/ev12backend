@@ -74,6 +74,22 @@ public class UserDeviceService {
     }
 
     @Transactional(readOnly = true)
+    public List<UserLookupResponse> listUsersLookupByLocation(Long locationId) {
+        if (!locationRepository.existsById(locationId)) {
+            throw new IllegalArgumentException("Location not found.");
+        }
+        return appUserRepository.findByLocationIdOrderByFirstNameAscLastNameAsc(locationId).stream()
+            .map(user -> new UserLookupResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                user.getRole().getCode()
+            ))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<LocationLookupResponse> listLocationsLookup() {
         return locationRepository.findAllByOrderByNameAsc().stream()
             .map(location -> new LocationLookupResponse(location.getId(), location.getName()))

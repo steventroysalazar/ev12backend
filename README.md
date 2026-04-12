@@ -161,6 +161,27 @@ Returns lightweight location list for location selectors.
 
 ---
 
+### `GET /api/lookups/locations/{locationId}/users`
+Returns lightweight users assigned to a specific location.
+
+**Path params**
+- `locationId` (required)
+
+**Example response**
+```json
+[
+  {
+    "id": 21,
+    "firstName": "Ari",
+    "lastName": "Lane",
+    "email": "ari@example.com",
+    "userRole": 3
+  }
+]
+```
+
+---
+
 ### `GET /api/lookups/alerts`
 Returns distinct active device alarm codes (`devices.alarmCode`) for current alert filtering.
 
@@ -192,11 +213,13 @@ Returns distinct values from alert logs for log filter controls.
 
 ```ts
 // Example: hydrate filter dropdowns in parallel
-const [managers, usersRole3, superAdmins, locations, alerts, alertLogFilters] = await Promise.all([
+const locationId = 11;
+const [managers, usersRole3, superAdmins, locations, locationUsers, alerts, alertLogFilters] = await Promise.all([
   api.get('/api/lookups/managers').then(r => r.data),
   api.get('/api/lookups/users').then(r => r.data),
   api.get('/api/lookups/super-admins').then(r => r.data),
   api.get('/api/lookups/locations').then(r => r.data),
+  api.get(`/api/lookups/locations/${locationId}/users`).then(r => r.data),
   api.get('/api/lookups/alerts').then(r => r.data),
   api.get('/api/lookups/alert-logs').then(r => r.data)
 ]);
@@ -206,6 +229,9 @@ const [managers, usersRole3, superAdmins, locations, alerts, alertLogFilters] = 
 
 // locations item shape:
 // { id, name }
+
+// locationUsers item shape:
+// { id, firstName, lastName, email, userRole }
 
 // alerts item shape:
 // string[]

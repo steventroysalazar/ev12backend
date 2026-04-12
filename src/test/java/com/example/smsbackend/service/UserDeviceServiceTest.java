@@ -159,6 +159,30 @@ class UserDeviceServiceTest {
         assertEquals(3, response.get(0).userRole());
     }
 
+
+    @Test
+    void listUsersLookupByLocation_returnsLocationUsers() {
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 11L);
+
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 21L);
+        user.setFirstName("Ari");
+        user.setLastName("Lane");
+        user.setEmail("ari@example.com");
+        user.setRole(UserRole.USER);
+        user.setLocation(location);
+
+        when(locationRepository.existsById(11L)).thenReturn(true);
+        when(appUserRepository.findByLocationIdOrderByFirstNameAscLastNameAsc(11L)).thenReturn(List.of(user));
+
+        var response = service.listUsersLookupByLocation(11L);
+
+        assertEquals(1, response.size());
+        assertEquals(21L, response.get(0).id());
+        assertEquals(3, response.get(0).userRole());
+    }
+
     @Test
     void listLocationsLookup_returnsSortedLocationLookupItems() {
         Location hq = new Location();

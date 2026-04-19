@@ -5,6 +5,7 @@ import com.example.smsbackend.dto.LocationResponse;
 import com.example.smsbackend.dto.UpdateLocationAlarmReceiverRequest;
 import com.example.smsbackend.dto.UpdateLocationRequest;
 import com.example.smsbackend.entity.Company;
+import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.CompanyRepository;
@@ -95,7 +96,9 @@ public class LocationService {
             .orElseThrow(() -> new IllegalArgumentException("Location not found."));
 
         if (request.accountNumber() != null) {
-            location.setAlarmReceiverAccountNumber(trimOrNull(request.accountNumber()));
+            String normalizedAccountNumber = trimOrNull(request.accountNumber());
+            location.setAlarmReceiverAccountNumber(normalizedAccountNumber);
+            syncDeviceBranchAccountNumbers(locationId, normalizedAccountNumber);
         }
 
         if (request.en() != null) {
@@ -137,6 +140,12 @@ public class LocationService {
             usersCount,
             devicesCount
         );
+    }
+
+    private void syncDeviceBranchAccountNumbers(Long locationId, String accountNumber) {
+        List<Device> devices = deviceRepository.findByUserLocationId(locationId);
+        devices.forEach(device -> device.setBranchAccountNumber(accountNumber));
+        deviceRepository.saveAll(devices);
     }
 
     private JsonNode toAlarmReceiverConfig(Location location) {

@@ -17,6 +17,7 @@ public record DeviceResponse(
     Double latitude,
     Double longitude,
     Instant locationUpdatedAt,
+    String branchAccountNumber,
     DeviceProtocolSettings protocolSettings,
     String configStatus,
     Instant configLastSentAt,

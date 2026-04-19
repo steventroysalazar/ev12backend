@@ -53,6 +53,10 @@ public class Device {
     @Column(name = "location_updated_at")
     private Instant locationUpdatedAt;
 
+
+    @Column(name = "branch_account_number", length = 80)
+    private String branchAccountNumber;
+
     @Lob
     @Column(name = "protocol_config")
     private String protocolConfig;
@@ -172,6 +176,14 @@ public class Device {
 
     public void setUser(AppUser user) {
         this.user = user;
+    }
+
+    public String getBranchAccountNumber() {
+        return branchAccountNumber;
+    }
+
+    public void setBranchAccountNumber(String branchAccountNumber) {
+        this.branchAccountNumber = branchAccountNumber;
     }
 
     public String getProtocolConfig() {

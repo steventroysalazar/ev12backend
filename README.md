@@ -585,10 +585,9 @@ Update location-specific alarm monitoring config (`Companies/{companyId}/ar/loca
 - If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
 
 **Frontend integration notes for your existing flow**
-- After saving location alarm config, keep your existing frontend cascade logic to update:
-  - `Watches/*/branchAccountNumber` for matching `locationId`
-  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
-- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+- Backend now also cascades the location `accountNumber` to all devices in that location as `branchAccountNumber` (watch-equivalent behavior).
+- Relay board updates are intentionally not part of this endpoint.
+- After this change, frontend only needs to call this API once, then use `GET /api/users/{userId}/devices`, `GET /api/locations/{locationId}/devices`, or `GET /api/devices` to read each device `branchAccountNumber`.
 
 ---
 
@@ -619,10 +618,9 @@ Update location-specific alarm monitoring config (`Companies/{companyId}/ar/loca
 - If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
 
 **Frontend integration notes for your existing flow**
-- After saving location alarm config, keep your existing frontend cascade logic to update:
-  - `Watches/*/branchAccountNumber` for matching `locationId`
-  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
-- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+- Backend now also cascades the location `accountNumber` to all devices in that location as `branchAccountNumber` (watch-equivalent behavior).
+- Relay board updates are intentionally not part of this endpoint.
+- After this change, frontend only needs to call this API once, then use `GET /api/users/{userId}/devices`, `GET /api/locations/{locationId}/devices`, or `GET /api/devices` to read each device `branchAccountNumber`.
 
 ---
 
@@ -653,10 +651,9 @@ Update location-specific alarm monitoring config (`Companies/{companyId}/ar/loca
 - If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
 
 **Frontend integration notes for your existing flow**
-- After saving location alarm config, keep your existing frontend cascade logic to update:
-  - `Watches/*/branchAccountNumber` for matching `locationId`
-  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
-- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+- Backend now also cascades the location `accountNumber` to all devices in that location as `branchAccountNumber` (watch-equivalent behavior).
+- Relay board updates are intentionally not part of this endpoint.
+- After this change, frontend only needs to call this API once, then use `GET /api/users/{userId}/devices`, `GET /api/locations/{locationId}/devices`, or `GET /api/devices` to read each device `branchAccountNumber`.
 
 ---
 
@@ -725,10 +722,9 @@ Update location-specific alarm monitoring config (`Companies/{companyId}/ar/loca
 - If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
 
 **Frontend integration notes for your existing flow**
-- After saving location alarm config, keep your existing frontend cascade logic to update:
-  - `Watches/*/branchAccountNumber` for matching `locationId`
-  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
-- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+- Backend now also cascades the location `accountNumber` to all devices in that location as `branchAccountNumber` (watch-equivalent behavior).
+- Relay board updates are intentionally not part of this endpoint.
+- After this change, frontend only needs to call this API once, then use `GET /api/users/{userId}/devices`, `GET /api/locations/{locationId}/devices`, or `GET /api/devices` to read each device `branchAccountNumber`.
 
 ---
 

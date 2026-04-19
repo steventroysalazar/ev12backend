@@ -22,6 +22,13 @@ If you are upgrading an existing database and see errors like `Database unavaila
 This script creates/backfills `companies`, company/location/user linkage columns, role value migrations, and foreign keys/indexes required by the new company hierarchy model.
 It also drops/recreates any legacy `app_users` role check constraints (name can vary per DB) so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
 
+For local boot reliability, default datasource now uses in-memory H2.
+Set these env vars in your real environment to use PostgreSQL:
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_DRIVER_CLASS_NAME` (typically `org.postgresql.Driver`)
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+
 ## Common headers
 
 Some gateway/webhook endpoints support optional headers:

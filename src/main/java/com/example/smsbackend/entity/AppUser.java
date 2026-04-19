@@ -65,17 +65,6 @@ public class AppUser {
     )
     private Set<Location> managedLocations = new HashSet<>();
 
-    @Column(name = "all_company_locations", nullable = false)
-    private boolean allCompanyLocations = true;
-
-    @ManyToMany
-    @JoinTable(
-        name = "company_admin_locations",
-        joinColumns = @JoinColumn(name = "app_user_id"),
-        inverseJoinColumns = @JoinColumn(name = "location_id")
-    )
-    private Set<Location> managedLocations = new HashSet<>();
-
     public Long getId() {
         return id;
     }
@@ -150,22 +139,6 @@ public class AppUser {
 
     public void setLocation(Location location) {
         this.location = location;
-    }
-
-    public boolean isAllCompanyLocations() {
-        return allCompanyLocations;
-    }
-
-    public void setAllCompanyLocations(boolean allCompanyLocations) {
-        this.allCompanyLocations = allCompanyLocations;
-    }
-
-    public Set<Location> getManagedLocations() {
-        return managedLocations;
-    }
-
-    public void setManagedLocations(Set<Location> managedLocations) {
-        this.managedLocations = managedLocations;
     }
 
     public boolean isAllCompanyLocations() {

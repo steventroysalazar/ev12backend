@@ -12,6 +12,7 @@ import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.entity.AppUser;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.AppUserRepository;
+import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import java.util.Optional;
@@ -29,6 +30,9 @@ class AuthServiceTest {
     private AppUserRepository appUserRepository;
 
     @Mock
+    private CompanyRepository companyRepository;
+
+    @Mock
     private LocationRepository locationRepository;
 
     @Mock
@@ -38,7 +42,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(appUserRepository, locationRepository, deviceRepository);
+        service = new AuthService(appUserRepository, companyRepository, locationRepository, deviceRepository);
     }
 
     @Test
@@ -66,6 +70,9 @@ class AuthServiceTest {
             2,
             null,
             null,
+            null,
+            null,
+            null,
             new CreateUserDeviceRequest("Truck GPS 01", "+1555999000", "862667084205114")
         ));
 
@@ -87,6 +94,9 @@ class AuthServiceTest {
             null,
             null,
             2,
+            null,
+            null,
+            null,
             null,
             null,
             new CreateUserDeviceRequest("Truck GPS 01", "+1555999000", "862667084205114")

@@ -3,8 +3,8 @@ package com.example.smsbackend.repository;
 import com.example.smsbackend.entity.Device;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface DeviceRepository extends JpaRepository<Device, Long> {
     List<Device> findByUserIdOrderByNameAsc(Long userId);
@@ -12,6 +12,8 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     long countByUserLocationId(Long locationId);
 
     List<Device> findByUserLocationId(Long locationId);
+
+    long countByUserCompanyId(Long companyId);
 
     Optional<Device> findByExternalDeviceId(String externalDeviceId);
 

@@ -6,7 +6,11 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LocationRepository extends JpaRepository<Location, Long> {
-    Optional<Location> findByNameIgnoreCase(String name);
+    Optional<Location> findByCompanyIdAndNameIgnoreCase(Long companyId, String name);
 
     List<Location> findAllByOrderByNameAsc();
+
+    List<Location> findByCompanyIdOrderByNameAsc(Long companyId);
+
+    long countByCompanyId(Long companyId);
 }

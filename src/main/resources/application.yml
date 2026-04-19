@@ -3,10 +3,10 @@ server:
 
 spring:
  datasource:
-        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-fancy-pond-a17fqnwa-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/smsbackend}
         driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
-        username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
-        password: ${SPRING_DATASOURCE_PASSWORD:npg_kdvM23qafLQn}
+        username: ${SPRING_DATASOURCE_USERNAME:postgres}
+        password: ${SPRING_DATASOURCE_PASSWORD:postgres}
 
  jpa:
         hibernate:

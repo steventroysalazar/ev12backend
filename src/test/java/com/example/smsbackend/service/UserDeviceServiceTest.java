@@ -81,10 +81,14 @@ class UserDeviceServiceTest {
             null,
             null,
             null,
+            null,
             3L,
             false,
             2L,
-            false
+            false,
+            null,
+            null,
+            null
         ));
 
         assertEquals(1L, response.id());
@@ -326,8 +330,8 @@ class UserDeviceServiceTest {
             null,
             null,
             null,
-            true,
             null,
+            true,
             null,
             null,
             null

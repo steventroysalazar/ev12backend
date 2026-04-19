@@ -17,6 +17,7 @@ import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
+import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +41,9 @@ class UserDeviceServiceTest {
     private DeviceRepository deviceRepository;
 
     @Mock
+    private CompanyRepository companyRepository;
+
+    @Mock
     private LocationRepository locationRepository;
 
     @Mock
@@ -49,18 +53,18 @@ class UserDeviceServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, new ObjectMapper(), deviceTelemetryLogService);
+        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, companyRepository, new ObjectMapper(), deviceTelemetryLogService);
     }
 
     @Test
     void updateUser_updatesManagerAndLocation() {
         AppUser user = new AppUser();
         ReflectionTestUtils.setField(user, "id", 1L);
-        user.setRole(UserRole.MANAGER);
+        user.setRole(UserRole.SUPER_ADMIN);
 
         AppUser manager = new AppUser();
         ReflectionTestUtils.setField(manager, "id", 2L);
-        manager.setRole(UserRole.MANAGER);
+        manager.setRole(UserRole.COMPANY_ADMIN);
 
         Location location = new Location();
         ReflectionTestUtils.setField(location, "id", 3L);
@@ -77,10 +81,14 @@ class UserDeviceServiceTest {
             null,
             null,
             null,
+            null,
             3L,
             false,
             2L,
-            false
+            false,
+            null,
+            null,
+            null
         ));
 
         assertEquals(1L, response.id());
@@ -104,7 +112,7 @@ class UserDeviceServiceTest {
         user.setLastName("Name");
         user.setContactNumber("+15551234567");
         user.setAddress("123 Main");
-        user.setRole(UserRole.USER);
+        user.setRole(UserRole.PORTAL_USER);
         user.setManager(manager);
         user.setLocation(location);
 
@@ -122,38 +130,38 @@ class UserDeviceServiceTest {
 
 
     @Test
-    void listManagersLookup_returnsOnlyRole2Users() {
+    void listCompanyAdminsLookup_returnsOnlyRole2Users() {
         AppUser manager = new AppUser();
         ReflectionTestUtils.setField(manager, "id", 2L);
         manager.setFirstName("Maya");
         manager.setLastName("Stone");
         manager.setEmail("maya@example.com");
-        manager.setRole(UserRole.MANAGER);
+        manager.setRole(UserRole.COMPANY_ADMIN);
 
-        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.MANAGER))
+        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.COMPANY_ADMIN))
             .thenReturn(List.of(manager));
 
-        var response = service.listManagersLookup();
+        var response = service.listCompanyAdminsLookup();
 
         assertEquals(1, response.size());
         assertEquals(2L, response.get(0).id());
         assertEquals(2, response.get(0).userRole());
-        verify(appUserRepository).findByRoleOrderByFirstNameAscLastNameAsc(UserRole.MANAGER);
+        verify(appUserRepository).findByRoleOrderByFirstNameAscLastNameAsc(UserRole.COMPANY_ADMIN);
     }
 
     @Test
-    void listRoleUsersLookup_returnsOnlyRole3Users() {
+    void listPortalUsersLookup_returnsOnlyRole3Users() {
         AppUser user = new AppUser();
         ReflectionTestUtils.setField(user, "id", 3L);
         user.setFirstName("Uma");
         user.setLastName("Ray");
         user.setEmail("uma@example.com");
-        user.setRole(UserRole.USER);
+        user.setRole(UserRole.PORTAL_USER);
 
-        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.USER))
+        when(appUserRepository.findByRoleOrderByFirstNameAscLastNameAsc(UserRole.PORTAL_USER))
             .thenReturn(List.of(user));
 
-        var response = service.listRoleUsersLookup();
+        var response = service.listPortalUsersLookup();
 
         assertEquals(1, response.size());
         assertEquals(3, response.get(0).userRole());
@@ -170,7 +178,7 @@ class UserDeviceServiceTest {
         user.setFirstName("Ari");
         user.setLastName("Lane");
         user.setEmail("ari@example.com");
-        user.setRole(UserRole.USER);
+        user.setRole(UserRole.PORTAL_USER);
         user.setLocation(location);
 
         when(locationRepository.existsById(11L)).thenReturn(true);
@@ -308,7 +316,7 @@ class UserDeviceServiceTest {
     void updateUser_rejectsRole3WithoutManager() {
         AppUser user = new AppUser();
         ReflectionTestUtils.setField(user, "id", 1L);
-        user.setRole(UserRole.USER);
+        user.setRole(UserRole.PORTAL_USER);
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
 
@@ -322,7 +330,11 @@ class UserDeviceServiceTest {
             null,
             null,
             null,
-            true
+            null,
+            true,
+            null,
+            null,
+            null
         )));
     }
 

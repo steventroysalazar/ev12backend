@@ -1,6 +1,7 @@
 package com.example.smsbackend.controller;
 
 import com.example.smsbackend.dto.AlertLogFiltersResponse;
+import com.example.smsbackend.dto.CompanyLookupResponse;
 import com.example.smsbackend.dto.LocationLookupResponse;
 import com.example.smsbackend.dto.UserLookupResponse;
 import com.example.smsbackend.service.DeviceTelemetryLogService;
@@ -24,19 +25,29 @@ public class LookupController {
         this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
-    @GetMapping("/managers")
-    public ResponseEntity<List<UserLookupResponse>> listManagers() {
-        return ResponseEntity.ok(userDeviceService.listManagersLookup());
+    @GetMapping("/company-admins")
+    public ResponseEntity<List<UserLookupResponse>> listCompanyAdmins() {
+        return ResponseEntity.ok(userDeviceService.listCompanyAdminsLookup());
     }
 
-    @GetMapping("/users")
-    public ResponseEntity<List<UserLookupResponse>> listUsersRoleLookup() {
-        return ResponseEntity.ok(userDeviceService.listRoleUsersLookup());
+    @GetMapping("/portal-users")
+    public ResponseEntity<List<UserLookupResponse>> listPortalUsers() {
+        return ResponseEntity.ok(userDeviceService.listPortalUsersLookup());
+    }
+
+    @GetMapping("/mobile-users")
+    public ResponseEntity<List<UserLookupResponse>> listMobileUsers() {
+        return ResponseEntity.ok(userDeviceService.listMobileUsersLookup());
     }
 
     @GetMapping("/super-admins")
     public ResponseEntity<List<UserLookupResponse>> listSuperAdmins() {
         return ResponseEntity.ok(userDeviceService.listSuperAdminsLookup());
+    }
+
+    @GetMapping("/companies")
+    public ResponseEntity<List<CompanyLookupResponse>> listCompanies() {
+        return ResponseEntity.ok(userDeviceService.listCompaniesLookup());
     }
 
     @GetMapping("/locations")

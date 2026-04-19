@@ -1,8 +1,8 @@
 # EV12 Backend API
 
 Spring Boot backend for:
-- Authentication and user management
-- Location and device management
+- Multi-company hierarchy (companies → locations → users → devices)
+- Authentication and user/device/location/company management
 - SMS gateway send/reply workflows
 - EV12 webhook ingestion
 - Device protocol configuration + SMS command delivery
@@ -31,7 +31,11 @@ Some gateway/webhook endpoints support optional headers:
 
 ---
 
-## Authentication APIs
+## User roles
+- `1 = SUPER_ADMIN` (global head/admin)
+- `2 = COMPANY_ADMIN` (company-level admin; all locations or selected locations)
+- `3 = PORTAL_USER` (web portal user)
+- `4 = MOBILE_APP_USER` (mobile app only user)
 
 ### `POST /api/auth/register`
 Create a new user.
@@ -296,46 +300,26 @@ const alertLogActionOptions = alertLogFilters.actions.map((action: string) => ({
 
 ---
 
-## Device APIs
+## Company APIs
 
-### `POST /api/users/{userId}/devices`
-Create a device for a specific user.
+### `POST /api/companies`
+Create a company.
 
-**Request body**
 ```json
 {
-  "name": "Truck GPS 01",
-  "phoneNumber": "+1555999000",
-  "externalDeviceId": "862667084205114"
+  "name": "Acme Logistics",
+  "details": "National operations"
 }
 ```
 
-**Required fields**
-- `name`, `phoneNumber`
+### `PUT /api/companies/{companyId}`
+Update company name/details.
 
-**Optional fields**
-- `externalDeviceId`: EV12 `deviceId` used for webhook alarm mapping
-
----
-
-### `POST /api/devices`
-Create a device by specifying `userId` in body.
-
-**Request body**
-```json
-{
-  "userId": 10,
-  "name": "Truck GPS 01",
-  "phoneNumber": "+1555999000",
-  "externalDeviceId": "862667084205114"
-}
-```
-
-**Required fields**
-- `userId`, `name`, `phoneNumber`
-
-**Optional fields**
-- `externalDeviceId`: EV12 `deviceId` used for webhook alarm mapping
+### `GET /api/companies`
+List companies with counts:
+- `locationsCount`
+- `usersCount`
+- `devicesCount`
 
 ---
 
@@ -538,8 +522,10 @@ List companies with aggregate counts (`locationsCount`, `usersCount`, `devicesCo
 
 ## Location APIs
 
-### `POST /api/locations`
-Create a location.
+## Company APIs
+
+### `POST /api/companies`
+Create a company.
 
 **Request body**
 ```json
@@ -555,10 +541,10 @@ Create a location.
 
 ---
 
-### `PUT /api/locations/{locationId}`
-Update location fields.
+### `PUT /api/companies/{companyId}/alarm-receiver`
+Update alarm receiver configuration and whitelists.
 
-**Request body (all optional)**
+**Request body**
 ```json
 {
   "name": "East Warehouse",
@@ -608,415 +594,291 @@ List locations. Response includes `alarmReceiverConfig` object with `account_num
 
 ---
 
-## Message/Gateway APIs
 
-### `POST /api/messages/send`
-Send an SMS through configured gateway.
+### `PUT /api/locations/{locationId}/alarm-receiver`
+Update location-specific alarm monitoring config (`Companies/{companyId}/ar/location/{locationId}` equivalent payload).
 
 **Request body**
 ```json
 {
-  "to": "+1555999000",
-  "message": "Hello device",
-  "slot": 1
+  "accountNumber": "ACCT-001",
+  "en": true,
+  "users": "john,jane,dispatch",
+  "toggleCompanyAlarmReceiver": true
+}
+```
+
+**Behavior**
+- Stores location-level alarm receiver config keys matching your frontend flow:
+  - `account_number`
+  - `en`
+  - `users`
+- If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
+
+**Frontend integration notes for your existing flow**
+- After saving location alarm config, keep your existing frontend cascade logic to update:
+  - `Watches/*/branchAccountNumber` for matching `locationId`
+  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
+- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+
+---
+
+### `GET /api/locations`
+List locations. Response includes `alarmReceiverConfig` object with `account_number`, `en`, and `users`.
+
+---
+
+## Company APIs
+
+### `POST /api/companies`
+Create a company.
+
+**Request body**
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
 **Required fields**
-- `to`, `message`
-
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
+- `name`, `companyId`
 
 ---
 
-### `GET /api/messages/replies`
-Fetch inbound reply messages from gateway.
+### `PUT /api/companies/{companyId}/alarm-receiver`
+Update alarm receiver configuration and whitelists.
 
-**Query params**
-- `phone` (optional)
-- `since` (optional)
-- `limit` (optional)
-
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
-
----
-
-### `GET /api/messages/health`
-Checks whether the gateway is reachable.
-
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
-
----
-
-### `GET /api/messages/debug/config`
-Returns resolved gateway configuration and token preview for debugging.
-
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
-
----
-
-## Device Config APIs
-
-### `POST /api/send-config`
-Persist a device protocol profile and send generated SMS commands to the device phone number.
-
-**Required request field**
-- `deviceId`
-
-**Request body shape**
-- Accepts all EV protocol fields used by UI/profile persistence, including:
-  - `contacts` array (`slot`, `smsEnabled`, `callEnabled`, `phone`, `name`)
-  - legacy contact fields (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`)
-  - device metadata fields (`imei`, `eviewVersion`)
-  - safety, positioning, network, mode, and device behavior fields (for example: `requestLocation`, `wifiEnabled`, `sosMode`, `geoFenceEnabled`, `apn`, `workingMode`, `timeZone`, `heartRateEnabled`, `checkStatus`, etc.)
-
-**Example request**
+**Request body**
 ```json
 {
-  "deviceId": 123,
-  "imei": "860000000000001",
-  "eviewVersion": "1.0.5",
-  "contacts": [
-    {
-      "slot": 1,
-      "smsEnabled": true,
-      "callEnabled": true,
-      "phone": "123456789",
-      "name": "Emma"
-    }
-  ],
-  "smsPassword": "123456",
-  "requestLocation": true,
-  "wifiEnabled": true,
-  "sosMode": 1,
-  "geoFenceEnabled": true,
-  "workingMode": "mode2",
-  "timeZone": "+1",
-  "checkStatus": true
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique per company (case-insensitive).
+
+---
+
+
+### `PUT /api/locations/{locationId}/alarm-receiver`
+Update location-specific alarm monitoring config (`Companies/{companyId}/ar/location/{locationId}` equivalent payload).
+
+**Request body**
+```json
+{
+  "accountNumber": "ACCT-001",
+  "en": true,
+  "users": "john,jane,dispatch",
+  "toggleCompanyAlarmReceiver": true
+}
+```
 
 **Behavior**
-1. Loads device by `deviceId`.
-2. Stores submitted config as `protocolSettings` on device.
-3. Builds command sequence.
-4. Splits commands into SMS-sized parts.
-5. Sends all command SMS messages through gateway.
-6. Marks device config status as `PENDING` and starts resend cooldown timer.
+- Stores location-level alarm receiver config keys matching your frontend flow:
+  - `account_number`
+  - `en`
+  - `users`
+- If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
+
+**Frontend integration notes for your existing flow**
+- After saving location alarm config, keep your existing frontend cascade logic to update:
+  - `Watches/*/branchAccountNumber` for matching `locationId`
+  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
+- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
 
 ---
 
-### `GET /api/devices/{deviceId}/config-status`
-Returns current queue status for the latest configuration request and auto-checks for device reply confirmation.
+### `GET /api/locations`
+List locations. Response includes `alarmReceiverConfig` object with `account_number`, `en`, and `users`.
 
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
+---
 
-**Behavior**
-- If status is `PENDING`, backend fetches inbound messages for the device number since the last config send time.
-- If at least one reply exists, status becomes `APPLIED` and `configAppliedAt` is stored.
-- Response includes `nextResendAt` so frontend can enable/disable resend button.
+## Location APIs
 
-**Example response**
+### `POST /api/locations`
+Create a location.
+
+**Request body**
 ```json
 {
-  "deviceId": 123,
-  "status": "PENDING",
-  "pending": true,
-  "lastSentAt": "2026-03-12T09:30:00Z",
-  "appliedAt": null,
-  "nextResendAt": "2026-03-12T09:35:00Z",
-  "commandPreview": "A1,1,1,123456789,Emma,P123456,loc"
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
----
+**Required fields**
+- `name`, `companyId`
 
-### `POST /api/devices/{deviceId}/config-resend`
-Resends the pending device configuration SMS command payload.
+### `POST /api/companies`
+Create a company.
 
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
-
-**Rules**
-- Works only if latest config status is `PENDING`.
-- Can be called only once every 5 minutes (HTTP `429` if called too soon).
-- Before resending, backend auto-checks for confirmation reply; if already confirmed, resend is rejected.
-
-**Example response**
+**Request body**
 ```json
 {
-  "success": true,
-  "deviceId": 123,
-  "status": "PENDING",
-  "sentAt": "2026-03-12T09:35:00Z",
-  "messages": [
-    { "message": "A1,1,1,123456789,Emma,P123456,loc" }
-  ]
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
----
-
-### `GET /api/inbound-messages`
-Fetch normalized inbound messages (timestamp formatted as ISO offset datetime).
-
-**Query params**
-- `since` (optional; accepts epoch seconds or epoch milliseconds)
-- `phone` (optional)
-- `limit` (optional)
-
-**Optional headers**
-- `Authorization`
-- `X-Gateway-Token`
-- `X-Gateway-Base-Url`
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique per company (case-insensitive).
 
 ---
 
-## EV12 Webhook APIs
+### `GET /api/companies`
+List companies with aggregate counts (`locationsCount`, `usersCount`, `devicesCount`).
 
-### `POST /api/webhooks/ev12`
-Ingest EV12 webhook payload in any content type.
+---
 
-**Consumes**
-- `*/*` (raw body supported)
+## Location APIs
 
-**Optional headers**
-- `Content-Type`
-- `X-Webhook-Token`
-- Any other raw headers are captured
+### `POST /api/locations`
+Create a location inside a company.
 
-**Response**
-- HTTP `201 Created`
-- Includes `{ "success": true, "event": ... }`
-- Alarm update processing always runs in background from the webhook payload.
-- Device location update processing also runs from the same webhook payload when `GPS Location` exists.
-- Event history storage is configurable:
-  - `webhook.ev12-persist-events=true`: save in database table `ev12_webhook_events`
-  - `webhook.ev12-persist-events=false` (default): keep only in-memory recent history
-
-**Webhook debug fields in `event`**
-- `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
-- `candidateIndex`: index of parsed payload candidate (helps when webhook contains nested/array entries).
-- `externalDeviceId`: device id extracted from webhook (what backend tries to match with device `externalDeviceId`).
-- `alarmCode`: alarm code extracted (`SOS Alert`, `SOS Ending`, `Fall-Down Alert`, etc.).
-- `eventTimestamp`: timestamp backend will use for update ordering.
-- `action`: backend action (`applied` or `ignored`).
-- `reason`: short explanation (for example `missing deviceId`, `missing alarm code`, `alarm code does not contain sos/fall`, `malformed or non-json payload`).
-
-**Example response (debug-friendly)**
 ```json
 {
-  "success": true,
-  "event": {
-    "id": 17,
-    "receivedAt": "2026-03-23T11:15:22.112Z",
-    "payloadJson": "{\"rawHeaders\":{\"x-webhook-token\":\"***\"},\"contentType\":\"application/json\",\"rawBody\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}",
-    "alarmAttempts": [
-      {
-        "candidateIndex": 0,
-        "externalDeviceId": "862667084205114",
-        "alarmCode": "SOS Alert",
-        "eventTimestamp": "2026-03-23T11:15:22.111Z",
-        "action": "applied",
-        "reason": "alarm code updated"
-      }
-    ]
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Required fields**
+- `name`, `companyId`
+
+---
+
+### `PUT /api/locations/{locationId}`
+Partial update location.
+
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique per company (case-insensitive).
+
+---
+
+### `GET /api/locations`
+Returns locations including `companyId`, `usersCount`, `devicesCount`.
+
+---
+
+## Authentication APIs
+
+### `POST /api/auth/register`
+Create a user.
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "password": "StrongPassword123",
+  "contactNumber": "+15550123",
+  "address": "123 Main St",
+  "userRole": 2,
+  "companyId": 10,
+  "locationId": 4,
+  "managerId": null,
+  "allCompanyLocations": false,
+  "managedLocationIds": [4, 6],
+  "device": {
+    "name": "Truck GPS 01",
+    "phoneNumber": "+1555999000",
+    "deviceId": "862667084205114"
   }
 }
 ```
 
-**Webhook debug fields in `event`**
-- `event.alarmAttempts`: array describing what backend detected and attempted from the webhook payload.
-- `candidateIndex`: index of parsed payload candidate (helps when webhook contains nested/array entries).
-- `externalDeviceId`: device id extracted from webhook (what backend tries to match with device `externalDeviceId`).
-- `alarmCode`: alarm code extracted (`SOS Alert`, `SOS Ending`, `Fall-Down Alert`, etc.).
-- `eventTimestamp`: timestamp backend will use for update ordering.
-- `action`: backend action (`queued` or `ignored`).
-- `reason`: short explanation (for example `missing deviceId`, `missing alarm code`, `alarm code does not contain sos/fall`, `malformed or non-json payload`).
+Notes:
+- Roles `2/3/4` require `companyId`.
+- Roles `3/4` must be assigned a role `2` manager (`managerId`).
+- For role `2`, set:
+  - `allCompanyLocations=true` to manage every company location, or
+  - `allCompanyLocations=false` + `managedLocationIds` for scoped access.
 
-**Example response (debug-friendly)**
-```json
-{
-  "success": true,
-  "event": {
-    "id": 17,
-    "receivedAt": "2026-03-23T11:15:22.112Z",
-    "payloadJson": "{\"rawHeaders\":{\"x-webhook-token\":\"***\"},\"contentType\":\"application/json\",\"rawBody\":\"{\\\"deviceId\\\":\\\"862667084205114\\\",\\\"data\\\":{\\\"Alarm Code\\\":[\\\"SOS Alert\\\"]}}\"}",
-    "alarmAttempts": [
-      {
-        "candidateIndex": 0,
-        "externalDeviceId": "862667084205114",
-        "alarmCode": "SOS Alert",
-        "eventTimestamp": "2026-03-23T11:15:22.111Z",
-        "action": "queued",
-        "reason": "alarm update enqueued"
-      }
-    ]
-  }
-}
-```
+### `POST /api/auth/login`
+Authenticate user.
 
 ---
 
+## User APIs
 
-**Alarm code tracking behavior**
-- When webhook `data["Alarm Code"]` includes `SOS Alert` and does **not** include `SOS Ending`, device `alarmCode` is set to `SOS Alert`.
-- When webhook `data["Alarm Code"]` includes `Fall-Down Alert` (and no `SOS Ending`), device `alarmCode` is set to `Fall-Down Alert`.
-- When webhook has only `SOS Ending`, it is ignored for active alarm counting.
-- Alarm updates apply only when the webhook `deviceId` matches a device `externalDeviceId`.
+### `GET /api/users`
+List users.
 
-**Device GPS location auto-update behavior**
-- If webhook payload contains `data["GPS Location"]` (array or object), backend reads the first valid coordinate object.
-- Supported coordinate keys: `latitude` + `longitude` (also accepts `lat` and `lng`/`lon`).
-- Backend updates matching device fields:
-  - `latitude`
-  - `longitude`
-  - `locationUpdatedAt` (uses webhook timestamp when available, otherwise server receive time)
-- Device matching uses webhook `deviceId` against device `externalDeviceId`.
+Optional query param:
+- `managerId`: list users assigned to one company admin.
 
-**Frontend sample device response (new fields)**
-```json
-{
-  "id": 12,
-  "userId": 10,
-  "name": "Truck GPS 01",
-  "phoneNumber": "+1555999000",
-  "externalDeviceId": "862667084205114",
-  "alarmCode": "Fall-Down Alert",
-  "alarmCancelledAt": null,
-  "lastPowerOnAt": "2026-03-26T02:01:10Z",
-  "lastPowerOffAt": null,
-  "lastDisconnectedAt": "2026-03-26T01:58:45.121Z",
-  "latitude": 15.1468038,
-  "longitude": 120.5463361,
-  "locationUpdatedAt": "2026-03-25T12:48:17.268Z",
-  "protocolSettings": null,
-  "configStatus": "IDLE",
-  "configLastSentAt": null,
-  "configAppliedAt": null
-}
-```
+### `PUT /api/users/{userId}`
+Partial update user.
 
-### `GET /api/webhooks/ev12/events`
-Return recent ingested EV12 webhook events.
+Supported fields:
+- basic profile fields
+- `userRole`
+- `companyId`
+- `locationId` / `clearLocation`
+- `managerId` / `clearManager`
+- `allCompanyLocations`
+- `managedLocationIds` / `clearManagedLocations`
 
-**Query params**
-- `limit` (optional; defaults to `200`)
-- Max `limit` is `500` per request.
-- Reads latest events from DB or from in-memory history, depending on `webhook.ev12-persist-events`.
-
-**Optional headers**
-- `X-Webhook-Token`
-
-**Common failure mode**
-- If storage is temporarily unavailable, API returns `503 Service Unavailable` with JSON:
-  - `error: "Database unavailable"`
-  - `message: "The service cannot access its database right now. Please retry shortly."`
-- If this API is behind Vercel/Azure/NGINX, that upstream `503` can appear in browser devtools as `502 Bad Gateway`.
-
-**Should you clear the table?**
-- Usually **no**: clearing `ev12_webhook_events` does not fix DB connectivity/auth/network failures.
-- It can still help if your history table became very large and requests are timing out.
-- Preferred cleanup path is `DELETE /api/webhooks/ev12/events` (same webhook token rules).
-- Direct SQL fallback:
-  - `DELETE FROM ev12_webhook_events;`
-  - `VACUUM (ANALYZE) ev12_webhook_events;` (Postgres)
-- If `webhook.ev12-persist-events=false`, there is no DB table write for webhook history; `DELETE /api/webhooks/ev12/events` clears in-memory history only.
-
----
-### `DELETE /api/webhooks/ev12/events`
-Clear stored EV12 webhook history.
-
-**Optional headers**
-- `X-Webhook-Token`
-
-**Response**
-- HTTP `200 OK`
-- Includes `{ "success": true, "deleted": <count> }`
+Response shape includes:
+- `companyId`
+- `allCompanyLocations`
+- `managedLocationIds`
 
 ---
 
-## Notes for frontend integration
-
-- Device list/read APIs return persisted `protocolSettings` when available.
-- `/api/send-config` is the preferred "save profile + send SMS commands" flow.
-
-- For a "Delete Webhook History" button in your frontend, call `DELETE /api/webhooks/ev12/events` and then refresh the table/list with `GET /api/webhooks/ev12/events`.
-- For webhook troubleshooting UI, render `event.alarmAttempts` in a table and show:
-  - extracted `externalDeviceId`
-  - extracted `alarmCode`
-  - `action` + `reason` (this tells you what backend tried to do and why).
-  - If `action=ignored`, the `reason` explains exactly why it was not written to DB (example: `no matching device found by externalDeviceId`).
-  - If `action=applied`, DB update already happened in the same webhook request.
-- Token precedence on gateway-backed endpoints:
-  1. `Authorization`
-  2. `X-Gateway-Token`
-  3. server config fallback
-
-### `GET /api/devices/{deviceId}/alarm-logs`
-Returns historical alarm log entries for one device (newest first).
-
-**What gets logged**
-- Alarm triggers from EV12 webhook (includes alarm code + snapshot coordinates if available).
-- Manual alarm cancellation via `PUT/PATCH /api/devices/{deviceId}` when `alarmCode` is cleared.
-
-**Response item**
-```json
-{
-  "id": 101,
-  "deviceId": 12,
-  "externalDeviceId": "862667084205114",
-  "alarmCode": "SOS Alert",
-  "action": "ALARM_TRIGGERED",
-  "source": "WEBHOOK",
-  "latitude": 15.1468038,
-  "longitude": 120.5463361,
-  "eventAt": "2026-04-01T12:00:00Z",
-  "note": "Alarm state updated from EV12 webhook"
-}
-```
+## Device APIs
+Device responses now include `companyId` for easier tenant-aware frontend filtering.
 
 ---
 
-### `GET /api/devices/{deviceId}/location-breadcrumbs`
-Returns location breadcrumb history for one device (newest first).
+## Lookup APIs
 
-**What gets logged**
-- Every coordinate update captured from EV12 webhook GPS payloads.
-- Coordinates parsed from inbound SMS messages (when the sender phone matches a device phone number).
+### `GET /api/lookups/company-admins`
+Role 2 users.
 
-**Response item**
-```json
-{
-  "id": 301,
-  "deviceId": 12,
-  "externalDeviceId": "862667084205114",
-  "latitude": 15.1468038,
-  "longitude": 120.5463361,
-  "source": "WEBHOOK",
-  "capturedAt": "2026-04-01T12:00:00Z",
-  "gatewayMessageId": null
-}
-```
+### `GET /api/lookups/portal-users`
+Role 3 users.
+
+### `GET /api/lookups/mobile-users`
+Role 4 users.
+
+### `GET /api/lookups/super-admins`
+Role 1 users.
+
+### `GET /api/lookups/companies`
+Lightweight company list: `{ id, name }`.
+
+### `GET /api/lookups/locations`
+Lightweight location list: `{ id, name }`.
+
+### `GET /api/lookups/locations/{locationId}/users`
+Users assigned to a location.
+
+### `GET /api/lookups/alerts`
+Distinct active `alarmCode` values.
+
+### `GET /api/lookups/alert-logs`
+Distinct filters from alert logs.
+

@@ -32,6 +32,9 @@ public class Device {
     @Column(name = "alarm_code", length = 64)
     private String alarmCode;
 
+    @Column(name = "alarm_triggered_at")
+    private Instant alarmTriggeredAt;
+
     @Column(name = "alarm_cancelled_at")
     private Instant alarmCancelledAt;
 
@@ -112,6 +115,14 @@ public class Device {
 
     public void setAlarmCode(String alarmCode) {
         this.alarmCode = alarmCode;
+    }
+
+    public Instant getAlarmTriggeredAt() {
+        return alarmTriggeredAt;
+    }
+
+    public void setAlarmTriggeredAt(Instant alarmTriggeredAt) {
+        this.alarmTriggeredAt = alarmTriggeredAt;
     }
 
     public Instant getAlarmCancelledAt() {

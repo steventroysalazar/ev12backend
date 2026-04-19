@@ -294,6 +294,7 @@ public class UserDeviceService {
                     ? request.alarmCancelledAt()
                     : Instant.now();
                 device.setAlarmCancelledAt(cancelledAt);
+                device.setAlarmTriggeredAt(null);
                 deviceTelemetryLogService.logAlarmEvent(
                     device,
                     "ALARM_CANCELLED",
@@ -302,6 +303,10 @@ public class UserDeviceService {
                     cancelledAt,
                     "Alarm cancelled from device update API"
                 );
+            }
+            if (nextAlarmCode != null && !nextAlarmCode.equalsIgnoreCase(String.valueOf(device.getAlarmCode()))) {
+                device.setAlarmTriggeredAt(Instant.now());
+                device.setAlarmCancelledAt(null);
             }
             device.setAlarmCode(nextAlarmCode);
         }
@@ -401,6 +406,7 @@ public class UserDeviceService {
             device.getPhoneNumber(),
             device.getExternalDeviceId(),
             device.getAlarmCode(),
+            device.getAlarmTriggeredAt(),
             device.getAlarmCancelledAt(),
             device.getLastPowerOnAt(),
             device.getLastPowerOffAt(),

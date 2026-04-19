@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -296,7 +297,30 @@ class UserDeviceServiceTest {
         var response = service.updateDevice(9L, request);
 
         assertEquals(null, response.alarmCode());
+        assertEquals(null, response.alarmTriggeredAt());
         assertEquals(cancelledAt, response.alarmCancelledAt());
+    }
+
+    @Test
+    void updateDevice_setsAlarmTriggeredAtWhenAlarmCodeIsSet() {
+        AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", 7L);
+
+        Device device = new Device();
+        ReflectionTestUtils.setField(device, "id", 9L);
+        device.setUser(user);
+
+        when(deviceRepository.findById(9L)).thenReturn(Optional.of(device));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateDeviceRequest request = new UpdateDeviceRequest();
+        request.setAlarmCode("Fall-Down Alert");
+
+        var response = service.updateDevice(9L, request);
+
+        assertEquals("Fall-Down Alert", response.alarmCode());
+        assertNotNull(response.alarmTriggeredAt());
+        assertEquals(null, response.alarmCancelledAt());
     }
 
     @Test

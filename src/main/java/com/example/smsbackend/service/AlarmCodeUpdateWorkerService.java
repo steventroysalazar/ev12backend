@@ -134,7 +134,12 @@ public class AlarmCodeUpdateWorkerService {
             return AlarmCodeUpdateResult.ignored("alarm code unchanged");
         }
 
+        Instant updatedAt = request.updatedAt() == null ? Instant.now() : request.updatedAt();
         device.setAlarmCode(request.alarmCode());
+        device.setAlarmTriggeredAt(request.alarmCode() == null ? null : updatedAt);
+        if (request.alarmCode() != null) {
+            device.setAlarmCancelledAt(null);
+        }
         Device savedDevice = deviceRepository.save(device);
         LOGGER.info(
             "Alarm code updated: deviceId='{}', externalDeviceId='{}', alarmCode='{}'",
@@ -142,7 +147,6 @@ public class AlarmCodeUpdateWorkerService {
             savedDevice.getExternalDeviceId(),
             savedDevice.getAlarmCode()
         );
-        Instant updatedAt = request.updatedAt() == null ? Instant.now() : request.updatedAt();
         deviceTelemetryLogService.logAlarmEvent(
             savedDevice,
             "ALARM_TRIGGERED",

@@ -9,8 +9,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "app_users")
@@ -43,12 +47,27 @@ public class AppUser {
     private UserRole role;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "location_id")
     private Location location;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
     private AppUser manager;
+
+    @Column(name = "all_company_locations", nullable = false)
+    private boolean allCompanyLocations = true;
+
+    @ManyToMany
+    @JoinTable(
+        name = "company_admin_locations",
+        joinColumns = @JoinColumn(name = "app_user_id"),
+        inverseJoinColumns = @JoinColumn(name = "location_id")
+    )
+    private Set<Location> managedLocations = new HashSet<>();
 
     public Long getId() {
         return id;
@@ -110,6 +129,14 @@ public class AppUser {
         this.role = role;
     }
 
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
     public Location getLocation() {
         return location;
     }
@@ -124,5 +151,21 @@ public class AppUser {
 
     public void setManager(AppUser manager) {
         this.manager = manager;
+    }
+
+    public boolean isAllCompanyLocations() {
+        return allCompanyLocations;
+    }
+
+    public void setAllCompanyLocations(boolean allCompanyLocations) {
+        this.allCompanyLocations = allCompanyLocations;
+    }
+
+    public Set<Location> getManagedLocations() {
+        return managedLocations;
+    }
+
+    public void setManagedLocations(Set<Location> managedLocations) {
+        this.managedLocations = managedLocations;
     }
 }

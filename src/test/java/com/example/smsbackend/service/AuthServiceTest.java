@@ -72,7 +72,6 @@ class AuthServiceTest {
             null,
             null,
             null,
-            null,
             new CreateUserDeviceRequest("Truck GPS 01", "+1555999000", "862667084205114")
         ));
 
@@ -94,7 +93,6 @@ class AuthServiceTest {
             null,
             null,
             2,
-            null,
             null,
             null,
             null,

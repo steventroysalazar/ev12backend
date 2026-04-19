@@ -122,19 +122,6 @@ public class UserDeviceService {
             .map(AuthService::toUserResponse)
             .toList();
     }
-
-    @Transactional(readOnly = true)
-    public List<UserResponse> listUsersByManager(Long managerId) {
-        AppUser manager = appUserRepository.findById(managerId)
-            .orElseThrow(() -> new IllegalArgumentException("Manager not found."));
-        if (manager.getRole() != UserRole.COMPANY_ADMIN) {
-            throw new IllegalArgumentException("Provided id is not a company admin.");
-        }
-        return appUserRepository.findByManagerId(managerId).stream()
-            .map(AuthService::toUserResponse)
-            .toList();
-    }
-
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         AppUser user = appUserRepository.findById(userId)
@@ -195,21 +182,6 @@ public class UserDeviceService {
             user.setLocation(location);
         }
 
-        if (Boolean.TRUE.equals(request.clearManager()) && request.managerId() != null) {
-            throw new IllegalArgumentException("Provide managerId or clearManager=true, not both.");
-        }
-
-        if (Boolean.TRUE.equals(request.clearManager())) {
-            user.setManager(null);
-        } else if (request.managerId() != null) {
-            AppUser manager = appUserRepository.findById(request.managerId())
-                .orElseThrow(() -> new IllegalArgumentException("Manager not found."));
-            if (manager.getRole() != UserRole.COMPANY_ADMIN) {
-                throw new IllegalArgumentException("Assigned manager must have role 2 (COMPANY_ADMIN).");
-            }
-            user.setManager(manager);
-        }
-
         if (request.allCompanyLocations() != null) {
             user.setAllCompanyLocations(request.allCompanyLocations());
         }
@@ -242,10 +214,6 @@ public class UserDeviceService {
         if (user.getLocation() != null && user.getCompany() != null
             && !user.getLocation().getCompany().getId().equals(user.getCompany().getId())) {
             throw new IllegalArgumentException("Selected location does not belong to user's company.");
-        }
-
-        if ((user.getRole() == UserRole.PORTAL_USER || user.getRole() == UserRole.MOBILE_APP_USER) && user.getManager() == null) {
-            throw new IllegalArgumentException("Roles 3 and 4 users must be assigned to a company admin (role 2).");
         }
 
         if (user.getRole() == UserRole.COMPANY_ADMIN) {

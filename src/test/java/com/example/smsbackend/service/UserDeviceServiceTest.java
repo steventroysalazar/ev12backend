@@ -57,20 +57,15 @@ class UserDeviceServiceTest {
     }
 
     @Test
-    void updateUser_updatesManagerAndLocation() {
+    void updateUser_updatesLocation() {
         AppUser user = new AppUser();
         ReflectionTestUtils.setField(user, "id", 1L);
         user.setRole(UserRole.SUPER_ADMIN);
-
-        AppUser manager = new AppUser();
-        ReflectionTestUtils.setField(manager, "id", 2L);
-        manager.setRole(UserRole.COMPANY_ADMIN);
 
         Location location = new Location();
         ReflectionTestUtils.setField(location, "id", 3L);
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(appUserRepository.findById(2L)).thenReturn(Optional.of(manager));
         when(locationRepository.findById(3L)).thenReturn(Optional.of(location));
         when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -84,8 +79,6 @@ class UserDeviceServiceTest {
             null,
             3L,
             false,
-            2L,
-            false,
             null,
             null,
             null
@@ -93,14 +86,10 @@ class UserDeviceServiceTest {
 
         assertEquals(1L, response.id());
         assertEquals(3L, response.locationId());
-        assertEquals(2L, response.managerId());
     }
 
     @Test
     void getUserById_returnsUserDetails() {
-        AppUser manager = new AppUser();
-        ReflectionTestUtils.setField(manager, "id", 2L);
-
         Location location = new Location();
         ReflectionTestUtils.setField(location, "id", 3L);
         location.setName("HQ");
@@ -113,7 +102,6 @@ class UserDeviceServiceTest {
         user.setContactNumber("+15551234567");
         user.setAddress("123 Main");
         user.setRole(UserRole.PORTAL_USER);
-        user.setManager(manager);
         user.setLocation(location);
 
         when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
@@ -124,7 +112,6 @@ class UserDeviceServiceTest {
         assertEquals("user@example.com", response.email());
         assertEquals("User", response.firstName());
         assertEquals("Name", response.lastName());
-        assertEquals(2L, response.managerId());
         assertEquals(3L, response.locationId());
     }
 
@@ -311,33 +298,6 @@ class UserDeviceServiceTest {
         assertEquals(null, response.alarmCode());
         assertEquals(cancelledAt, response.alarmCancelledAt());
     }
-
-    @Test
-    void updateUser_rejectsRole3WithoutManager() {
-        AppUser user = new AppUser();
-        ReflectionTestUtils.setField(user, "id", 1L);
-        user.setRole(UserRole.PORTAL_USER);
-
-        when(appUserRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        assertThrows(IllegalArgumentException.class, () -> service.updateUser(1L, new UpdateUserRequest(
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            true,
-            null,
-            null,
-            null
-        )));
-    }
-
 
     @Test
     void listAllDevices_ignoresInvalidProtocolSettingsJson() {

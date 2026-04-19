@@ -54,9 +54,16 @@ public class AppUser {
     @JoinColumn(name = "location_id")
     private Location location;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "manager_id")
-    private AppUser manager;
+    @Column(name = "all_company_locations", nullable = false)
+    private boolean allCompanyLocations = true;
+
+    @ManyToMany
+    @JoinTable(
+        name = "company_admin_locations",
+        joinColumns = @JoinColumn(name = "app_user_id"),
+        inverseJoinColumns = @JoinColumn(name = "location_id")
+    )
+    private Set<Location> managedLocations = new HashSet<>();
 
     @Column(name = "all_company_locations", nullable = false)
     private boolean allCompanyLocations = true;
@@ -145,12 +152,20 @@ public class AppUser {
         this.location = location;
     }
 
-    public AppUser getManager() {
-        return manager;
+    public boolean isAllCompanyLocations() {
+        return allCompanyLocations;
     }
 
-    public void setManager(AppUser manager) {
-        this.manager = manager;
+    public void setAllCompanyLocations(boolean allCompanyLocations) {
+        this.allCompanyLocations = allCompanyLocations;
+    }
+
+    public Set<Location> getManagedLocations() {
+        return managedLocations;
+    }
+
+    public void setManagedLocations(Set<Location> managedLocations) {
+        this.managedLocations = managedLocations;
     }
 
     public boolean isAllCompanyLocations() {

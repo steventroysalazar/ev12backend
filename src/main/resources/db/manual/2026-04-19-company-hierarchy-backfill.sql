@@ -41,6 +41,24 @@ ALTER TABLE locations ADD COLUMN IF NOT EXISTS alarm_receiver_users VARCHAR(2000
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS company_id BIGINT;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS all_company_locations BOOLEAN NOT NULL DEFAULT TRUE;
 
+-- manager_id is no longer used in user model
+DO $$
+DECLARE
+    c RECORD;
+BEGIN
+    FOR c IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'app_users'::regclass
+          AND pg_get_constraintdef(oid) ILIKE '%manager_id%'
+    LOOP
+        EXECUTE format('ALTER TABLE app_users DROP CONSTRAINT %I', c.conname);
+    END LOOP;
+END $$;
+
+ALTER TABLE app_users DROP COLUMN IF EXISTS manager_id;
+
+
 CREATE TABLE IF NOT EXISTS company_admin_locations (
     app_user_id BIGINT NOT NULL,
     location_id BIGINT NOT NULL,

@@ -13,8 +13,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByLocationIdOrderByFirstNameAscLastNameAsc(Long locationId);
 
-    List<AppUser> findByManagerId(Long managerId);
-
     List<AppUser> findByRoleOrderByFirstNameAscLastNameAsc(UserRole role);
 
     long countByCompanyId(Long companyId);

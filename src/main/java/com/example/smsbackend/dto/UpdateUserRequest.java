@@ -13,8 +13,6 @@ public record UpdateUserRequest(
     Long companyId,
     Long locationId,
     Boolean clearLocation,
-    Long managerId,
-    Boolean clearManager,
     Boolean allCompanyLocations,
     List<Long> managedLocationIds,
     Boolean clearManagedLocations

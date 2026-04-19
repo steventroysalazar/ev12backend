@@ -53,7 +53,6 @@ Create a new user.
   "userRole": 2,
   "companyId": 1,
   "locationId": 4,
-  "managerId": 7,
   "allCompanyLocations": false,
   "managedLocationIds": [4, 9],
   "device": {
@@ -71,7 +70,6 @@ Create a new user.
 - `email` must be valid.
 - `userRole`: `1=SUPER_ADMIN`, `2=COMPANY_ADMIN`, `3=PORTAL_USER`, `4=MOBILE_APP_USER`
 - Roles `2/3/4` must include `companyId`.
-- Roles `3/4` must include `managerId` of a role `2` user.
 - Role `2` can be scoped with `allCompanyLocations=false` + `managedLocationIds`.
 - `device` is optional, but when provided it creates a device during registration.
 - `device.deviceId` is stored as `externalDeviceId` and used to map EV12 webhook `deviceId` to this device.
@@ -99,8 +97,6 @@ Authenticate and return auth payload.
 ### `GET /api/users`
 List users.
 
-**Query params**
-- `managerId` (optional): filter users by manager
 
 ---
 
@@ -118,21 +114,16 @@ Update user fields (partial update behavior).
   "userRole": 2,
   "companyId": 1,
   "locationId": 4,
-  "managerId": 7,
   "allCompanyLocations": false,
   "managedLocationIds": [4, 9],
-  "clearLocation": false,
-  "clearManager": false
+  "clearLocation": false
 }
 ```
 
 **Notes**
 - Only supplied fields are updated.
 - `clearLocation=true` removes assigned location.
-- `clearManager=true` removes assigned manager.
 - Do not send `locationId` together with `clearLocation=true`.
-- Do not send `managerId` together with `clearManager=true`.
-- Roles `3` and `4` users must still have a role `2` manager.
 - Role `2` users may manage all company locations or a specific subset (`managedLocationIds`).
 
 ---
@@ -278,7 +269,7 @@ const [companyAdmins, usersRole3, mobileUsers, superAdmins, companies, locations
 
 ```ts
 // Example: convert lookup payload into <Select /> options
-const managerOptions = companyAdmins.map((m: any) => ({
+const companyAdminOptions = companyAdmins.map((m: any) => ({
   value: m.id,
   label: `${m.firstName} ${m.lastName} (${m.email})`
 }));

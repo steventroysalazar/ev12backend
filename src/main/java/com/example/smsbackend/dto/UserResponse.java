@@ -12,7 +12,6 @@ public record UserResponse(
     Integer userRole,
     Long companyId,
     Long locationId,
-    Long managerId,
     Boolean allCompanyLocations,
     List<Long> managedLocationIds
 ) {

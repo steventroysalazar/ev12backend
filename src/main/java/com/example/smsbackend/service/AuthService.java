@@ -66,15 +66,6 @@ public class AuthService {
         assignCompany(user, request.companyId());
         assignLocation(user, request.locationId());
 
-        if (request.managerId() != null) {
-            AppUser manager = appUserRepository.findById(request.managerId())
-                .orElseThrow(() -> new IllegalArgumentException("Manager not found."));
-            if (manager.getRole() != UserRole.COMPANY_ADMIN) {
-                throw new IllegalArgumentException("Assigned manager must have role 2 (COMPANY_ADMIN).");
-            }
-            user.setManager(manager);
-        }
-
         boolean allCompanyLocations = request.allCompanyLocations() == null || request.allCompanyLocations();
         user.setAllCompanyLocations(allCompanyLocations);
         syncManagedLocations(user, request.managedLocationIds());
@@ -126,7 +117,6 @@ public class AuthService {
             user.getRole().getCode(),
             user.getCompany() != null ? user.getCompany().getId() : null,
             user.getLocation() != null ? user.getLocation().getId() : null,
-            user.getManager() != null ? user.getManager().getId() : null,
             user.isAllCompanyLocations(),
             managedLocationIds
         );
@@ -183,10 +173,6 @@ public class AuthService {
         if (user.getLocation() != null && user.getCompany() != null
             && !user.getLocation().getCompany().getId().equals(user.getCompany().getId())) {
             throw new IllegalArgumentException("Selected location does not belong to user's company.");
-        }
-
-        if ((user.getRole() == UserRole.PORTAL_USER || user.getRole() == UserRole.MOBILE_APP_USER) && user.getManager() == null) {
-            throw new IllegalArgumentException("Roles 3 and 4 users must be assigned to a company admin (role 2).");
         }
 
         if (user.getRole() == UserRole.COMPANY_ADMIN) {

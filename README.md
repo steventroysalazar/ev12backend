@@ -20,6 +20,7 @@ If you are upgrading an existing database and see errors like `Database unavaila
 - `src/main/resources/db/manual/2026-04-19-company-hierarchy-backfill.sql`
 
 This script creates/backfills `companies`, company/location/user linkage columns, role value migrations, and foreign keys/indexes required by the new company hierarchy model.
+It also replaces legacy `app_users_role_check` so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
 
 ## Common headers
 
@@ -557,6 +558,40 @@ Update alarm receiver configuration and whitelists.
 - Any provided field is updated.
 - To clear details, send `"details": ""`.
 - Location names remain unique per company (case-insensitive).
+
+---
+
+
+### `PUT /api/locations/{locationId}/alarm-receiver`
+Update location-specific alarm monitoring config (`Companies/{companyId}/ar/location/{locationId}` equivalent payload).
+
+**Request body**
+```json
+{
+  "accountNumber": "ACCT-001",
+  "en": true,
+  "users": "john,jane,dispatch",
+  "toggleCompanyAlarmReceiver": true
+}
+```
+
+**Behavior**
+- Stores location-level alarm receiver config keys matching your frontend flow:
+  - `account_number`
+  - `en`
+  - `users`
+- If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
+
+**Frontend integration notes for your existing flow**
+- After saving location alarm config, keep your existing frontend cascade logic to update:
+  - `Watches/*/branchAccountNumber` for matching `locationId`
+  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
+- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+
+---
+
+### `GET /api/locations`
+List locations. Response includes `alarmReceiverConfig` object with `account_number`, `en`, and `users`.
 
 ---
 

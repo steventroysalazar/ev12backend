@@ -71,6 +71,25 @@ WHERE company_id IS NULL;
 UPDATE app_users SET role = 'COMPANY_ADMIN' WHERE role = 'MANAGER';
 UPDATE app_users SET role = 'PORTAL_USER'  WHERE role = 'USER';
 
+
+-- Replace legacy role check constraint (often SUPER_ADMIN/MANAGER/USER)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'app_users_role_check'
+          AND conrelid = 'app_users'::regclass
+    ) THEN
+        ALTER TABLE app_users DROP CONSTRAINT app_users_role_check;
+    END IF;
+END $$;
+
+ALTER TABLE app_users
+ADD CONSTRAINT app_users_role_check
+CHECK (role IN ('SUPER_ADMIN', 'COMPANY_ADMIN', 'PORTAL_USER', 'MOBILE_APP_USER'));
+
+
 ALTER TABLE locations
     ALTER COLUMN company_id SET NOT NULL;
 

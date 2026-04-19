@@ -1,5 +1,6 @@
 package com.example.smsbackend.service;
 
+import com.example.smsbackend.dto.CompanyLookupResponse;
 import com.example.smsbackend.dto.CreateDeviceRequest;
 import com.example.smsbackend.dto.DeviceAlarmLogResponse;
 import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
@@ -7,21 +8,25 @@ import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.LocationLookupResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
-import com.example.smsbackend.dto.UserLookupResponse;
 import com.example.smsbackend.dto.UpdateUserRequest;
+import com.example.smsbackend.dto.UserLookupResponse;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
+import com.example.smsbackend.entity.Company;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
+import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,6 +46,7 @@ public class UserDeviceService {
     private final AppUserRepository appUserRepository;
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
+    private final CompanyRepository companyRepository;
     private final ObjectMapper objectMapper;
     private final DeviceTelemetryLogService deviceTelemetryLogService;
 
@@ -48,29 +54,36 @@ public class UserDeviceService {
         AppUserRepository appUserRepository,
         DeviceRepository deviceRepository,
         LocationRepository locationRepository,
+        CompanyRepository companyRepository,
         ObjectMapper objectMapper,
         DeviceTelemetryLogService deviceTelemetryLogService
     ) {
         this.appUserRepository = appUserRepository;
         this.deviceRepository = deviceRepository;
         this.locationRepository = locationRepository;
+        this.companyRepository = companyRepository;
         this.objectMapper = objectMapper;
         this.deviceTelemetryLogService = deviceTelemetryLogService;
     }
 
     @Transactional(readOnly = true)
-    public List<UserLookupResponse> listManagersLookup() {
-        return listUsersLookupByRole(UserRole.MANAGER);
+    public List<UserLookupResponse> listCompanyAdminsLookup() {
+        return listUsersLookupByRole(UserRole.COMPANY_ADMIN);
     }
 
     @Transactional(readOnly = true)
-    public List<UserLookupResponse> listRoleUsersLookup() {
-        return listUsersLookupByRole(UserRole.USER);
+    public List<UserLookupResponse> listPortalUsersLookup() {
+        return listUsersLookupByRole(UserRole.PORTAL_USER);
     }
 
     @Transactional(readOnly = true)
     public List<UserLookupResponse> listSuperAdminsLookup() {
         return listUsersLookupByRole(UserRole.SUPER_ADMIN);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserLookupResponse> listMobileUsersLookup() {
+        return listUsersLookupByRole(UserRole.MOBILE_APP_USER);
     }
 
     @Transactional(readOnly = true)
@@ -97,24 +110,18 @@ public class UserDeviceService {
     }
 
     @Transactional(readOnly = true)
+    public List<CompanyLookupResponse> listCompaniesLookup() {
+        return companyRepository.findAllByOrderByNameAsc().stream()
+            .map(company -> new CompanyLookupResponse(company.getId(), company.getName()))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<UserResponse> listUsers() {
         return appUserRepository.findAll().stream()
             .map(AuthService::toUserResponse)
             .toList();
     }
-
-    @Transactional(readOnly = true)
-    public List<UserResponse> listUsersByManager(Long managerId) {
-        AppUser manager = appUserRepository.findById(managerId)
-            .orElseThrow(() -> new IllegalArgumentException("Manager not found."));
-        if (manager.getRole() != UserRole.MANAGER) {
-            throw new IllegalArgumentException("Provided id is not a manager.");
-        }
-        return appUserRepository.findByManagerId(managerId).stream()
-            .map(AuthService::toUserResponse)
-            .toList();
-    }
-
     @Transactional(readOnly = true)
     public UserResponse getUserById(Long userId) {
         AppUser user = appUserRepository.findById(userId)
@@ -157,6 +164,12 @@ public class UserDeviceService {
             user.setRole(mapRole(request.userRole()));
         }
 
+        if (request.companyId() != null) {
+            Company company = companyRepository.findById(request.companyId())
+                .orElseThrow(() -> new IllegalArgumentException("Company not found."));
+            user.setCompany(company);
+        }
+
         if (Boolean.TRUE.equals(request.clearLocation()) && request.locationId() != null) {
             throw new IllegalArgumentException("Provide locationId or clearLocation=true, not both.");
         }
@@ -169,27 +182,55 @@ public class UserDeviceService {
             user.setLocation(location);
         }
 
-        if (Boolean.TRUE.equals(request.clearManager()) && request.managerId() != null) {
-            throw new IllegalArgumentException("Provide managerId or clearManager=true, not both.");
+        if (request.allCompanyLocations() != null) {
+            user.setAllCompanyLocations(request.allCompanyLocations());
         }
 
-        if (Boolean.TRUE.equals(request.clearManager())) {
-            user.setManager(null);
-        } else if (request.managerId() != null) {
-            AppUser manager = appUserRepository.findById(request.managerId())
-                .orElseThrow(() -> new IllegalArgumentException("Manager not found."));
-            if (manager.getRole() != UserRole.MANAGER) {
-                throw new IllegalArgumentException("Assigned manager must have role 2 (MANAGER).");
+        if (Boolean.TRUE.equals(request.clearManagedLocations()) && request.managedLocationIds() != null) {
+            throw new IllegalArgumentException("Provide managedLocationIds or clearManagedLocations=true, not both.");
+        }
+
+        if (Boolean.TRUE.equals(request.clearManagedLocations())) {
+            user.getManagedLocations().clear();
+        } else if (request.managedLocationIds() != null) {
+            Set<Location> locations = new HashSet<>(locationRepository.findAllById(request.managedLocationIds()));
+            if (locations.size() != request.managedLocationIds().size()) {
+                throw new IllegalArgumentException("One or more managedLocationIds are invalid.");
             }
-            user.setManager(manager);
+            user.setManagedLocations(locations);
         }
 
-        if (user.getRole() == UserRole.USER && user.getManager() == null) {
-            throw new IllegalArgumentException("Role 3 user must be assigned to a manager (role 2).");
-        }
+        validateUserRelationships(user);
 
         AppUser saved = appUserRepository.save(user);
         return AuthService.toUserResponse(saved);
+    }
+
+    private void validateUserRelationships(AppUser user) {
+        if (user.getRole() != UserRole.SUPER_ADMIN && user.getCompany() == null) {
+            throw new IllegalArgumentException("Roles 2, 3, and 4 must belong to a company.");
+        }
+
+        if (user.getLocation() != null && user.getCompany() != null
+            && !user.getLocation().getCompany().getId().equals(user.getCompany().getId())) {
+            throw new IllegalArgumentException("Selected location does not belong to user's company.");
+        }
+
+        if (user.getRole() == UserRole.COMPANY_ADMIN) {
+            if (!user.isAllCompanyLocations() && user.getManagedLocations().isEmpty()) {
+                throw new IllegalArgumentException("Company admin with allCompanyLocations=false must include managedLocationIds.");
+            }
+            if (user.getCompany() != null) {
+                boolean mismatch = user.getManagedLocations().stream()
+                    .anyMatch(location -> !location.getCompany().getId().equals(user.getCompany().getId()));
+                if (mismatch) {
+                    throw new IllegalArgumentException("All managed locations must belong to the same company.");
+                }
+            }
+        } else {
+            user.setAllCompanyLocations(true);
+            user.getManagedLocations().clear();
+        }
     }
 
     @Transactional
@@ -337,9 +378,10 @@ public class UserDeviceService {
     private UserRole mapRole(Integer code) {
         return switch (code) {
             case 1 -> UserRole.SUPER_ADMIN;
-            case 2 -> UserRole.MANAGER;
-            case 3 -> UserRole.USER;
-            default -> throw new IllegalArgumentException("Invalid userRole. Use 1=super admin, 2=manager, 3=user.");
+            case 2 -> UserRole.COMPANY_ADMIN;
+            case 3 -> UserRole.PORTAL_USER;
+            case 4 -> UserRole.MOBILE_APP_USER;
+            default -> throw new IllegalArgumentException("Invalid userRole. Use 1=super admin, 2=company admin, 3=portal user, 4=mobile app user.");
         };
     }
 
@@ -354,6 +396,7 @@ public class UserDeviceService {
         return new DeviceResponse(
             device.getId(),
             device.getUser().getId(),
+            device.getUser().getCompany() != null ? device.getUser().getCompany().getId() : null,
             device.getName(),
             device.getPhoneNumber(),
             device.getExternalDeviceId(),
@@ -423,7 +466,7 @@ public class UserDeviceService {
         try {
             return objectMapper.readValue(value, DeviceProtocolSettings.class);
         } catch (JsonProcessingException exception) {
-            LOGGER.warn("Unable to read protocol settings JSON for device payload. Returning null settings.", exception);
+            LOGGER.warn("Unable to parse protocol settings JSON for device response: {}", exception.getMessage());
             return null;
         }
     }

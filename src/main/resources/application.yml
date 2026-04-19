@@ -2,18 +2,18 @@ server:
   port: 8090
 
 spring:
- datasource:
-        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-fancy-pond-a17fqnwa-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
-        driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
-        username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
-        password: ${SPRING_DATASOURCE_PASSWORD:npg_kdvM23qafLQn}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/smsbackend;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE;AUTO_SERVER=TRUE}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.h2.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
 
- jpa:
-        hibernate:
-            ddl-auto: update
-        open-in-view: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
 
- h2:
+  h2:
     console:
       enabled: ${SPRING_H2_CONSOLE_ENABLED:true}
       path: /h2-console

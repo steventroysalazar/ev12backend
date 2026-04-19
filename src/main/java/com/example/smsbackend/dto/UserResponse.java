@@ -1,5 +1,7 @@
 package com.example.smsbackend.dto;
 
+import java.util.List;
+
 public record UserResponse(
     Long id,
     String email,
@@ -8,7 +10,9 @@ public record UserResponse(
     String contactNumber,
     String address,
     Integer userRole,
+    Long companyId,
     Long locationId,
-    Long managerId
+    Boolean allCompanyLocations,
+    List<Long> managedLocationIds
 ) {
 }

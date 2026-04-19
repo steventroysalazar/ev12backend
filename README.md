@@ -22,8 +22,8 @@ If you are upgrading an existing database and see errors like `Database unavaila
 This script creates/backfills `companies`, company/location/user linkage columns, role value migrations, and foreign keys/indexes required by the new company hierarchy model.
 It also drops/recreates any legacy `app_users` role check constraints (name can vary per DB) so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
 
-For local boot reliability, default datasource now uses in-memory H2.
-Set these env vars in your real environment to use PostgreSQL:
+Default datasource fallback is PostgreSQL local (`localhost:5432/smsbackend`).
+Set these env vars for your target DB environment:
 - `SPRING_DATASOURCE_URL`
 - `SPRING_DATASOURCE_DRIVER_CLASS_NAME` (typically `org.postgresql.Driver`)
 - `SPRING_DATASOURCE_USERNAME`
@@ -76,6 +76,7 @@ Create a new user.
 **Notes**
 - `email` must be valid.
 - `userRole`: `1=SUPER_ADMIN`, `2=COMPANY_ADMIN`, `3=PORTAL_USER`, `4=MOBILE_APP_USER`
+- Role `1` (SUPER_ADMIN) has global access across all companies and locations.
 - Roles `2/3/4` must include `companyId`.
 - Role `2` can be scoped with `allCompanyLocations=false` + `managedLocationIds`.
 - `device` is optional, but when provided it creates a device during registration.
@@ -96,6 +97,9 @@ Authenticate and return auth payload.
 
 **Required fields**
 - `email`, `password`
+
+**Migration compatibility note**
+- If a legacy user record still has plaintext password stored, first successful login auto-upgrades it to bcrypt.
 
 ---
 

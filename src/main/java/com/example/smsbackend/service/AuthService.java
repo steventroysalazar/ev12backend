@@ -91,13 +91,18 @@ public class AuthService {
         return toUserResponse(saved);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         AppUser user = appUserRepository.findByEmailIgnoreCase(request.email().trim())
             .orElseThrow(() -> new IllegalArgumentException("Invalid email or password."));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid email or password.");
+            if (request.password().equals(user.getPasswordHash())) {
+                user.setPasswordHash(passwordEncoder.encode(request.password()));
+                appUserRepository.save(user);
+            } else {
+                throw new IllegalArgumentException("Invalid email or password.");
+            }
         }
 
         String tokenRaw = user.getEmail() + ":" + Instant.now().toEpochMilli();

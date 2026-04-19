@@ -6,11 +6,21 @@ Spring Boot backend for:
 - SMS gateway send/reply workflows
 - EV12 webhook ingestion
 - Device protocol configuration + SMS command delivery
+- Company hierarchy support (companies → locations → users → devices)
 
 ## Base URL
 
 All endpoints below are relative to your API host, for example:
-- Local: `http://localhost:8080`
+- Local: `http://localhost:8090`
+
+## Database migration (required for existing databases)
+
+If you are upgrading an existing database and see errors like `Database unavailable`, run this idempotent SQL file in your PostgreSQL SQL editor first:
+
+- `src/main/resources/db/manual/2026-04-19-company-hierarchy-backfill.sql`
+
+This script creates/backfills `companies`, company/location/user linkage columns, role value migrations, and foreign keys/indexes required by the new company hierarchy model.
+It also replaces legacy `app_users_role_check` so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
 
 ## Common headers
 
@@ -37,8 +47,11 @@ Create a new user.
   "contactNumber": "+15550123",
   "address": "123 Main St",
   "userRole": 2,
+  "companyId": 1,
   "locationId": 4,
   "managerId": 7,
+  "allCompanyLocations": false,
+  "managedLocationIds": [4, 9],
   "device": {
     "name": "Truck GPS 01",
     "phoneNumber": "+1555999000",
@@ -52,7 +65,10 @@ Create a new user.
 
 **Notes**
 - `email` must be valid.
-- `userRole`: `1=SUPER_ADMIN`, `2=MANAGER`, `3=USER`
+- `userRole`: `1=SUPER_ADMIN`, `2=COMPANY_ADMIN`, `3=PORTAL_USER`, `4=MOBILE_APP_USER`
+- Roles `2/3/4` must include `companyId`.
+- Roles `3/4` must include `managerId` of a role `2` user.
+- Role `2` can be scoped with `allCompanyLocations=false` + `managedLocationIds`.
 - `device` is optional, but when provided it creates a device during registration.
 - `device.deviceId` is stored as `externalDeviceId` and used to map EV12 webhook `deviceId` to this device.
 
@@ -96,8 +112,11 @@ Update user fields (partial update behavior).
   "contactNumber": "+15550123",
   "address": "123 Main St",
   "userRole": 2,
+  "companyId": 1,
   "locationId": 4,
   "managerId": 7,
+  "allCompanyLocations": false,
+  "managedLocationIds": [4, 9],
   "clearLocation": false,
   "clearManager": false
 }
@@ -109,7 +128,8 @@ Update user fields (partial update behavior).
 - `clearManager=true` removes assigned manager.
 - Do not send `locationId` together with `clearLocation=true`.
 - Do not send `managerId` together with `clearManager=true`.
-- Role `3` users must still have a manager.
+- Roles `3` and `4` users must still have a role `2` manager.
+- Role `2` users may manage all company locations or a specific subset (`managedLocationIds`).
 
 ---
 
@@ -118,8 +138,8 @@ Update user fields (partial update behavior).
 
 These endpoints return compact records for frontend filter controls and select inputs, so you do not need to fetch full `/api/users` payloads.
 
-### `GET /api/lookups/managers`
-Returns only users with role `2` (MANAGER).
+### `GET /api/lookups/company-admins`
+Returns only users with role `2` (COMPANY_ADMIN).
 
 **Example response**
 ```json
@@ -136,13 +156,23 @@ Returns only users with role `2` (MANAGER).
 
 ---
 
-### `GET /api/lookups/users`
-Returns only users with role `3` (USER).
+### `GET /api/lookups/portal-users`
+Returns only users with role `3` (PORTAL_USER).
+
+---
+
+### `GET /api/lookups/mobile-users`
+Returns only users with role `4` (MOBILE_APP_USER).
 
 ---
 
 ### `GET /api/lookups/super-admins`
 Returns only users with role `1` (SUPER_ADMIN).
+
+---
+
+### `GET /api/lookups/companies`
+Returns lightweight company list for selectors.
 
 ---
 
@@ -214,17 +244,19 @@ Returns distinct values from alert logs for log filter controls.
 ```ts
 // Example: hydrate filter dropdowns in parallel
 const locationId = 11;
-const [managers, usersRole3, superAdmins, locations, locationUsers, alerts, alertLogFilters] = await Promise.all([
-  api.get('/api/lookups/managers').then(r => r.data),
-  api.get('/api/lookups/users').then(r => r.data),
+const [companyAdmins, usersRole3, mobileUsers, superAdmins, companies, locations, locationUsers, alerts, alertLogFilters] = await Promise.all([
+  api.get('/api/lookups/company-admins').then(r => r.data),
+  api.get('/api/lookups/portal-users').then(r => r.data),
+  api.get('/api/lookups/mobile-users').then(r => r.data),
   api.get('/api/lookups/super-admins').then(r => r.data),
+  api.get('/api/lookups/companies').then(r => r.data),
   api.get('/api/lookups/locations').then(r => r.data),
   api.get(`/api/lookups/locations/${locationId}/users`).then(r => r.data),
   api.get('/api/lookups/alerts').then(r => r.data),
   api.get('/api/lookups/alert-logs').then(r => r.data)
 ]);
 
-// managers/usersRole3/superAdmins item shape:
+// companyAdmins/usersRole3/mobileUsers/superAdmins item shape:
 // { id, firstName, lastName, email, userRole }
 
 // locations item shape:
@@ -242,7 +274,7 @@ const [managers, usersRole3, superAdmins, locations, locationUsers, alerts, aler
 
 ```ts
 // Example: convert lookup payload into <Select /> options
-const managerOptions = managers.map((m: any) => ({
+const managerOptions = companyAdmins.map((m: any) => ({
   value: m.id,
   label: `${m.firstName} ${m.lastName} (${m.email})`
 }));
@@ -341,6 +373,7 @@ Update device fields (partial update behavior).
 - `userId` reassigns the device.
 - `protocolSettings` persists EV protocol profile on the device record.
 - `externalDeviceId` links the API device to EV12 webhook payload `deviceId`.
+- Device responses now include `companyId` (derived from the assigned user).
 - Device responses include alarm tracking fields for frontend state:
   - `alarmCode`: current active alarm (`SOS Alert`, `Fall-Down Alert`, or `null` when cancelled/idle)
 - Device responses include latest telemetry location fields (auto-updated by EV12 webhook GPS payloads):
@@ -453,6 +486,57 @@ const stop = startAlarmStream((update) => {
 > Recommended UX: show a persistent alarm badge/toast and a global sound/vibration trigger based on `alarm-update`, not per-page polling.
 
 ---
+
+## Company APIs
+
+### `POST /api/companies`
+Create a company.
+
+**Request body**
+```json
+{
+  "companyName": "Acme Logistics",
+  "details": "National operations",
+  "address": "123 Main St",
+  "city": "Dallas",
+  "state": "TX",
+  "postalCode": "75001",
+  "country": "USA",
+  "phone": "+15551234567",
+  "isAlarmReceiverIncluded": true
+}
+```
+
+### `PUT /api/companies/{companyId}`
+Update company profile fields (`companyName`, address, phone, AR include flag, etc.).
+
+### `PUT /api/companies/{companyId}/alarm-receiver`
+Update alarm receiver configuration and whitelists.
+
+**Request body**
+```json
+{
+  "alarmReceiverConfig": {
+    "en": true,
+    "server": {
+      "xml": "MAS",
+      "MAS": {
+        "primary": { "url": "https://primary.example", "user": "u1", "pass": "p1" },
+        "backup": { "url": "https://backup.example", "user": "u2", "pass": "p2" }
+      }
+    }
+  },
+  "dnsWhitelist": ["api.example.com", "backup.example.com"],
+  "ipWhitelist": ["1.1.1.1", "8.8.8.8"],
+  "alarmReceiverEnabled": true
+}
+```
+
+### `GET /api/companies`
+List companies with aggregate counts (`locationsCount`, `usersCount`, `devicesCount`) and full company profile/alarm-receiver config fields.
+
+---
+
 ## Location APIs
 
 ### `POST /api/locations`
@@ -462,12 +546,13 @@ Create a location.
 ```json
 {
   "name": "East Warehouse",
-  "details": "Dock 2 and 3"
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
 **Required fields**
-- `name`
+- `name`, `companyId`
 
 ---
 
@@ -478,19 +563,49 @@ Update location fields.
 ```json
 {
   "name": "East Warehouse",
-  "details": "Dock 2 and 3"
+  "details": "Dock 2 and 3",
+  "companyId": 1
 }
 ```
 
 **Notes**
 - Any provided field is updated.
 - To clear details, send `"details": ""`.
-- Location names remain unique (case-insensitive).
+- Location names remain unique per company (case-insensitive).
+
+---
+
+
+### `PUT /api/locations/{locationId}/alarm-receiver`
+Update location-specific alarm monitoring config (`Companies/{companyId}/ar/location/{locationId}` equivalent payload).
+
+**Request body**
+```json
+{
+  "accountNumber": "ACCT-001",
+  "en": true,
+  "users": "john,jane,dispatch",
+  "toggleCompanyAlarmReceiver": true
+}
+```
+
+**Behavior**
+- Stores location-level alarm receiver config keys matching your frontend flow:
+  - `account_number`
+  - `en`
+  - `users`
+- If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
+
+**Frontend integration notes for your existing flow**
+- After saving location alarm config, keep your existing frontend cascade logic to update:
+  - `Watches/*/branchAccountNumber` for matching `locationId`
+  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
+- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
 
 ---
 
 ### `GET /api/locations`
-List locations.
+List locations. Response includes `alarmReceiverConfig` object with `account_number`, `en`, and `users`.
 
 ---
 

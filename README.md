@@ -20,7 +20,7 @@ If you are upgrading an existing database and see errors like `Database unavaila
 - `src/main/resources/db/manual/2026-04-19-company-hierarchy-backfill.sql`
 
 This script creates/backfills `companies`, company/location/user linkage columns, role value migrations, and foreign keys/indexes required by the new company hierarchy model.
-It also replaces legacy `app_users_role_check` so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
+It also drops/recreates any legacy `app_users` role check constraints (name can vary per DB) so new role values (`COMPANY_ADMIN`, `PORTAL_USER`, `MOBILE_APP_USER`) stop failing inserts.
 
 ## Common headers
 

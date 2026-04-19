@@ -72,17 +72,20 @@ UPDATE app_users SET role = 'COMPANY_ADMIN' WHERE role = 'MANAGER';
 UPDATE app_users SET role = 'PORTAL_USER'  WHERE role = 'USER';
 
 
--- Replace legacy role check constraint (often SUPER_ADMIN/MANAGER/USER)
+-- Replace *any* legacy role check constraints (constraint names may vary by DB)
 DO $$
+DECLARE
+    c RECORD;
 BEGIN
-    IF EXISTS (
-        SELECT 1
+    FOR c IN
+        SELECT conname
         FROM pg_constraint
-        WHERE conname = 'app_users_role_check'
-          AND conrelid = 'app_users'::regclass
-    ) THEN
-        ALTER TABLE app_users DROP CONSTRAINT app_users_role_check;
-    END IF;
+        WHERE conrelid = 'app_users'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) ILIKE '%role%'
+    LOOP
+        EXECUTE format('ALTER TABLE app_users DROP CONSTRAINT %I', c.conname);
+    END LOOP;
 END $$;
 
 ALTER TABLE app_users

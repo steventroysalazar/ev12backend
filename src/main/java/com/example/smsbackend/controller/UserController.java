@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,13 +32,8 @@ public class UserController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<UserResponse>> listUsers(
-        @RequestParam(required = false) Long managerId
-    ) {
-        List<UserResponse> response = managerId == null
-            ? userDeviceService.listUsers()
-            : userDeviceService.listUsersByManager(managerId);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<List<UserResponse>> listUsers() {
+        return ResponseEntity.ok(userDeviceService.listUsers());
     }
 
     @GetMapping("/users/{userId}")

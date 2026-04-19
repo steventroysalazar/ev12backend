@@ -362,6 +362,8 @@ Update device fields (partial update behavior).
 - Device responses now include `companyId` (derived from the assigned user).
 - Device responses include alarm tracking fields for frontend state:
   - `alarmCode`: current active alarm (`SOS Alert`, `Fall-Down Alert`, or `null` when cancelled/idle)
+  - `alarmTriggeredAt`: UTC timestamp when the current `alarmCode` was triggered (falls back to webhook `updatedAt`)
+  - `alarmCancelledAt`: UTC timestamp when alarm was cancelled/cleared
 - Device responses include latest telemetry location fields (auto-updated by EV12 webhook GPS payloads):
   - `latitude`: last known latitude from webhook `GPS Location`
   - `longitude`: last known longitude from webhook `GPS Location`
@@ -914,4 +916,3 @@ Distinct active `alarmCode` values.
 
 ### `GET /api/lookups/alert-logs`
 Distinct filters from alert logs.
-

@@ -10,6 +10,7 @@ public record DeviceResponse(
     String phoneNumber,
     String externalDeviceId,
     String alarmCode,
+    Instant alarmTriggeredAt,
     Instant alarmCancelledAt,
     Instant lastPowerOnAt,
     Instant lastPowerOffAt,

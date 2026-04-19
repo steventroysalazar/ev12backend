@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +39,7 @@ class LocationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LocationService(locationRepository, companyRepository, appUserRepository, deviceRepository);
+        service = new LocationService(locationRepository, companyRepository, appUserRepository, deviceRepository, new ObjectMapper());
     }
 
     @Test

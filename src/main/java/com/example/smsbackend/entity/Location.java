@@ -28,6 +28,15 @@ public class Location {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
+    @Column(name = "alarm_receiver_account_number", length = 80)
+    private String alarmReceiverAccountNumber;
+
+    @Column(name = "alarm_receiver_enabled", nullable = false)
+    private boolean alarmReceiverEnabled;
+
+    @Column(name = "alarm_receiver_users", length = 2000)
+    private String alarmReceiverUsersJson;
+
     public Long getId() {
         return id;
     }
@@ -54,5 +63,29 @@ public class Location {
 
     public void setCompany(Company company) {
         this.company = company;
+    }
+
+    public String getAlarmReceiverAccountNumber() {
+        return alarmReceiverAccountNumber;
+    }
+
+    public void setAlarmReceiverAccountNumber(String alarmReceiverAccountNumber) {
+        this.alarmReceiverAccountNumber = alarmReceiverAccountNumber;
+    }
+
+    public boolean isAlarmReceiverEnabled() {
+        return alarmReceiverEnabled;
+    }
+
+    public void setAlarmReceiverEnabled(boolean alarmReceiverEnabled) {
+        this.alarmReceiverEnabled = alarmReceiverEnabled;
+    }
+
+    public String getAlarmReceiverUsersJson() {
+        return alarmReceiverUsersJson;
+    }
+
+    public void setAlarmReceiverUsersJson(String alarmReceiverUsersJson) {
+        this.alarmReceiverUsersJson = alarmReceiverUsersJson;
     }
 }

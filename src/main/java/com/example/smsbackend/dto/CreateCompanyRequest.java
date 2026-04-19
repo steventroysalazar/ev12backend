@@ -1,9 +1,15 @@
 package com.example.smsbackend.dto;
 
-import jakarta.validation.constraints.NotBlank;
-
 public record CreateCompanyRequest(
-    @NotBlank String name,
-    String details
+    String name,
+    String companyName,
+    String details,
+    String address,
+    String city,
+    String state,
+    String postalCode,
+    String country,
+    String phone,
+    Boolean isAlarmReceiverIncluded
 ) {
 }

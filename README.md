@@ -470,13 +470,83 @@ Create a company.
 **Request body**
 ```json
 {
-  "name": "Acme Logistics",
-  "details": "National operations"
+  "companyName": "Acme Logistics",
+  "details": "National operations",
+  "address": "123 Main St",
+  "city": "Dallas",
+  "state": "TX",
+  "postalCode": "75001",
+  "country": "USA",
+  "phone": "+15551234567",
+  "isAlarmReceiverIncluded": true
 }
 ```
 
 ### `PUT /api/companies/{companyId}`
-Update company fields.
+Update company profile fields (`companyName`, address, phone, AR include flag, etc.).
+
+### `PUT /api/companies/{companyId}/alarm-receiver`
+Update alarm receiver configuration and whitelists.
+
+**Request body**
+```json
+{
+  "alarmReceiverConfig": {
+    "en": true,
+    "server": {
+      "xml": "MAS",
+      "MAS": {
+        "primary": { "url": "https://primary.example", "user": "u1", "pass": "p1" },
+        "backup": { "url": "https://backup.example", "user": "u2", "pass": "p2" }
+      }
+    }
+  },
+  "dnsWhitelist": ["api.example.com", "backup.example.com"],
+  "ipWhitelist": ["1.1.1.1", "8.8.8.8"],
+  "alarmReceiverEnabled": true
+}
+```
+
+### `GET /api/companies`
+List companies with aggregate counts (`locationsCount`, `usersCount`, `devicesCount`) and full company profile/alarm-receiver config fields.
+
+---
+
+## Location APIs
+
+### `POST /api/locations`
+Create a location.
+
+**Request body**
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Required fields**
+- `name`, `companyId`
+
+### `POST /api/companies`
+Create a company.
+
+**Request body**
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique per company (case-insensitive).
+
+---
 
 ### `GET /api/companies`
 List companies with aggregate counts (`locationsCount`, `usersCount`, `devicesCount`).

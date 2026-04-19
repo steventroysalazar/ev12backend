@@ -2,6 +2,7 @@ package com.example.smsbackend.controller;
 
 import com.example.smsbackend.dto.CompanyResponse;
 import com.example.smsbackend.dto.CreateCompanyRequest;
+import com.example.smsbackend.dto.UpdateCompanyAlarmReceiverRequest;
 import com.example.smsbackend.dto.UpdateCompanyRequest;
 import com.example.smsbackend.service.CompanyService;
 import jakarta.validation.Valid;
@@ -36,6 +37,14 @@ public class CompanyController {
         @Valid @RequestBody UpdateCompanyRequest request
     ) {
         return ResponseEntity.ok(companyService.updateCompany(companyId, request));
+    }
+
+    @PutMapping("/{companyId}/alarm-receiver")
+    public ResponseEntity<CompanyResponse> updateAlarmReceiverConfig(
+        @PathVariable Long companyId,
+        @RequestBody UpdateCompanyAlarmReceiverRequest request
+    ) {
+        return ResponseEntity.ok(companyService.updateAlarmReceiverConfig(companyId, request));
     }
 
     @GetMapping

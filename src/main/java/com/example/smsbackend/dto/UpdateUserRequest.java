@@ -1,6 +1,7 @@
 package com.example.smsbackend.dto;
 
 import jakarta.validation.constraints.Email;
+import java.util.List;
 
 public record UpdateUserRequest(
     String firstName,
@@ -9,9 +10,13 @@ public record UpdateUserRequest(
     String contactNumber,
     String address,
     Integer userRole,
+    Long companyId,
     Long locationId,
     Boolean clearLocation,
     Long managerId,
-    Boolean clearManager
+    Boolean clearManager,
+    Boolean allCompanyLocations,
+    List<Long> managedLocationIds,
+    Boolean clearManagedLocations
 ) {
 }

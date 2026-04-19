@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/companies")
+@RequestMapping({"/api/companies", "api/companies"})
 public class CompanyController {
 
     private final CompanyService companyService;

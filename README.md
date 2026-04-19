@@ -586,6 +586,78 @@ List locations. Response includes `alarmReceiverConfig` object with `account_num
 
 ---
 
+## Company APIs
+
+### `POST /api/companies`
+Create a company.
+
+**Request body**
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Required fields**
+- `name`, `companyId`
+
+---
+
+### `PUT /api/companies/{companyId}/alarm-receiver`
+Update alarm receiver configuration and whitelists.
+
+**Request body**
+```json
+{
+  "name": "East Warehouse",
+  "details": "Dock 2 and 3",
+  "companyId": 1
+}
+```
+
+**Notes**
+- Any provided field is updated.
+- To clear details, send `"details": ""`.
+- Location names remain unique per company (case-insensitive).
+
+---
+
+
+### `PUT /api/locations/{locationId}/alarm-receiver`
+Update location-specific alarm monitoring config (`Companies/{companyId}/ar/location/{locationId}` equivalent payload).
+
+**Request body**
+```json
+{
+  "accountNumber": "ACCT-001",
+  "en": true,
+  "users": "john,jane,dispatch",
+  "toggleCompanyAlarmReceiver": true
+}
+```
+
+**Behavior**
+- Stores location-level alarm receiver config keys matching your frontend flow:
+  - `account_number`
+  - `en`
+  - `users`
+- If `toggleCompanyAlarmReceiver=true`, backend toggles company alarm receiver enable off->on to trigger re-init behavior.
+
+**Frontend integration notes for your existing flow**
+- After saving location alarm config, keep your existing frontend cascade logic to update:
+  - `Watches/*/branchAccountNumber` for matching `locationId`
+  - `RelayBoards/*/conf/ban` for matching `conf.lo_idn`
+- Those Watch/RelayBoard collections are not modeled in this backend schema yet, so continue updating them from frontend (or a separate service) exactly like your current function.
+
+---
+
+### `GET /api/locations`
+List locations. Response includes `alarmReceiverConfig` object with `account_number`, `en`, and `users`.
+
+---
+
 ## Location APIs
 
 ### `POST /api/locations`

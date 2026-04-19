@@ -2,10 +2,13 @@ package com.example.smsbackend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.smsbackend.dto.UpdateLocationAlarmReceiverRequest;
 import com.example.smsbackend.dto.UpdateLocationRequest;
 import com.example.smsbackend.entity.Company;
+import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.CompanyRepository;
@@ -62,5 +65,27 @@ class LocationServiceTest {
 
         assertEquals("New HQ", response.name());
         assertEquals(null, response.details());
+    }
+
+    @Test
+    void updateLocationAlarmReceiverConfig_syncsDeviceBranchAccountNumbers() {
+        Location location = new Location();
+        ReflectionTestUtils.setField(location, "id", 7L);
+        Company company = new Company();
+        ReflectionTestUtils.setField(company, "id", 2L);
+        location.setCompany(company);
+
+        Device device = new Device();
+        when(locationRepository.findById(7L)).thenReturn(Optional.of(location));
+        when(deviceRepository.findByUserLocationId(7L)).thenReturn(java.util.List.of(device));
+        when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(appUserRepository.findByLocationId(7L)).thenReturn(java.util.List.of());
+        when(deviceRepository.countByUserLocationId(7L)).thenReturn(1L);
+
+        service.updateLocationAlarmReceiverConfig(7L, new UpdateLocationAlarmReceiverRequest(" ACC-42 ", true, null, false));
+
+        assertEquals("ACC-42", location.getAlarmReceiverAccountNumber());
+        assertEquals("ACC-42", device.getBranchAccountNumber());
+        verify(deviceRepository).saveAll(any());
     }
 }

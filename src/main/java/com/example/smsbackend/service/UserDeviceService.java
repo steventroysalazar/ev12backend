@@ -408,6 +408,7 @@ public class UserDeviceService {
             device.getLatitude(),
             device.getLongitude(),
             device.getLocationUpdatedAt(),
+            device.getBranchAccountNumber(),
             fromProtocolSettingsJson(device.getProtocolConfig()),
             device.getConfigStatus(),
             device.getConfigLastSentAt(),

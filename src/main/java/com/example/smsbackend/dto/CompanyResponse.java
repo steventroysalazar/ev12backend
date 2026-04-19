@@ -1,10 +1,10 @@
 package com.example.smsbackend.dto;
 
-public record LocationResponse(
+public record CompanyResponse(
     Long id,
     String name,
     String details,
-    Long companyId,
+    long locationsCount,
     long usersCount,
     long devicesCount
 ) {

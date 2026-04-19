@@ -5,6 +5,7 @@ import java.time.Instant;
 public record DeviceResponse(
     Long id,
     Long userId,
+    Long companyId,
     String name,
     String phoneNumber,
     String externalDeviceId,

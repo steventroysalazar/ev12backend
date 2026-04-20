@@ -396,6 +396,116 @@ List devices for all users under a location.
 
 ---
 
+## Device Settings Defaults (for frontend prefill/reference)
+
+Use this section to pre-populate frontend device settings when a device is first added.
+
+### Audio defaults
+
+| Setting | Default |
+|---|---|
+| Ringtone volume | `100` |
+| Microphone volume | `10` *(mid-level on 0..15 scale)* |
+| Speaker volume | `100` |
+
+### Input / button behavior defaults
+
+| Setting | Default |
+|---|---|
+| Feedback mode | `vibrate + voice prompt` |
+| Long press time | `2.0s` *(20 × 0.1s)* |
+| SOS task | `enabled` |
+| SOS trigger mode | `long press` |
+
+### Fall / motion defaults
+
+| Setting | Default |
+|---|---|
+| Fall detection sensor | `enabled` |
+| Fall wait time | configurable `10..600 sec` (`0` = disabled special case) |
+| Fall sensitivity | `6` *(middle fallback for frontend prefill; firmware/provisioning may override)* |
+| Motion detection level | `7` *(scale 1..16)* |
+
+### Scanning / location defaults
+
+| Setting | Default |
+|---|---|
+| Wi-Fi/BLE scan interval | `180 sec` |
+| GPS interval | `180 sec` |
+| BLE scan time | `5 sec` |
+| BLE sleep time | `55 sec` |
+
+### Time / alert defaults
+
+| Setting | Default |
+|---|---|
+| General alert timer | `21600 sec` *(6 hours)* |
+| Manual update threshold | `1200 sec` *(20 min)* |
+
+### Alarm clock defaults
+
+| Setting | Default |
+|---|---|
+| Alarm type | `standard alarm` |
+| Hour | `0` |
+| Minute | `0` |
+| Reminder duration | `30 sec` |
+| Voice repeat | `22` |
+| Ringtone | `1` |
+
+### Network / system defaults
+
+| Setting | Default |
+|---|---|
+| Preferred network | `GSM/WCDMA/LTE (auto)` |
+| CLIR (caller ID) | `network default` |
+| Factory mode | `data-off mode` |
+
+### Feature toggle defaults
+
+| Setting | Default |
+|---|---|
+| VoLTE | `enabled` |
+| Welfare check SMS ack | `off` |
+| Debug LED | `off` |
+| NFC | `off` |
+| LoRa | `off` |
+
+### Location feature defaults
+
+| Setting | Default |
+|---|---|
+| Homecheck | `off` (`Homecheck0`) |
+| Beacon | `off` (`beacon0`) |
+| SMS GEO | `off` (`smsgeo0`) |
+| Long SMS | `off` (`lsms0`) |
+
+### Power alert defaults (EV-05)
+
+| Setting | Default |
+|---|---|
+| Power-on alert | `off` |
+| Power-off alert | `off` |
+
+### Watch UI defaults (EV-05)
+
+| Setting | Default |
+|---|---|
+| Time report | `off` |
+| Raise hand detect | `off` |
+| Tap screen wake | `off` |
+| Step display | `off` |
+| Heart display | `off` |
+| Heart menu | `on` |
+| Step menu | `on` |
+| Contact menu | `on` |
+| Weather menu | `off` |
+| Settings menu | `on` |
+
+> Note: fall sensitivity is not formally documented in exposed defaults. `6` is a practical middle prefill for UI consistency, but firmware/provisioning may override it.
+
+---
+
 
 ## Live alarm stream (frontend "always listening")
 

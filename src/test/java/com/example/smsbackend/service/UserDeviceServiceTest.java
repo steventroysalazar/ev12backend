@@ -50,11 +50,14 @@ class UserDeviceServiceTest {
     @Mock
     private DeviceTelemetryLogService deviceTelemetryLogService;
 
+    @Mock
+    private DeviceImeiService deviceImeiService;
+
     private UserDeviceService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, companyRepository, new ObjectMapper(), deviceTelemetryLogService);
+        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, companyRepository, new ObjectMapper(), deviceTelemetryLogService, deviceImeiService);
     }
 
     @Test

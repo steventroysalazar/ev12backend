@@ -11,7 +11,6 @@ import com.example.smsbackend.dto.SendMessageRequest;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.DeviceRepository;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +53,7 @@ class DeviceImeiServiceTest {
         ReflectionTestUtils.setField(device, "id", 10L);
         device.setPhoneNumber("+15551234567");
 
-        when(deviceRepository.findByPhoneNumber("+15551234567")).thenReturn(Optional.of(device));
+        when(deviceRepository.findAll()).thenReturn(List.of(device));
 
         service.processReplies(List.of(new GatewayReplyMessage(
             101L,
@@ -78,7 +77,6 @@ class DeviceImeiServiceTest {
         ReflectionTestUtils.setField(newestPending, "id", 9L);
         newestPending.setPhoneNumber("15551234567");
 
-        when(deviceRepository.findByPhoneNumber("+15551234567")).thenReturn(Optional.empty());
         when(deviceRepository.findAll()).thenReturn(List.of(older, newestPending));
 
         service.processReplies(List.of(new GatewayReplyMessage(

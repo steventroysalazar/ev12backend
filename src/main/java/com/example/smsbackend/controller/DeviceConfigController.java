@@ -193,6 +193,7 @@ public class DeviceConfigController {
         GatewayRequestOptions options = new GatewayRequestOptions(gatewayBaseUrl, resolvedToken);
 
         List<GatewayReplyMessage> replies = gatewayClientService.fetchMessages(phone, normalizedSince, limit, options);
+        deviceImeiService.processReplies(replies);
         replies.forEach(this::logSmsLocation);
 
         List<InboundMessageResponse> response = replies.stream().map(item -> new InboundMessageResponse(

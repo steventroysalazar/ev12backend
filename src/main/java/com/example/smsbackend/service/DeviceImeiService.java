@@ -92,8 +92,19 @@ public class DeviceImeiService {
                 return;
             }
 
-            device.setExternalDeviceId(normalizedImei);
-            deviceRepository.save(device);
+            try {
+                device.setExternalDeviceId(normalizedImei);
+                deviceRepository.save(device);
+            } catch (Exception exception) {
+                LOGGER.warn(
+                    "Failed to persist IMEI from SMS reply. deviceId='{}', phone='{}', imei='{}', reason='{}'",
+                    device.getId(),
+                    reply.from(),
+                    normalizedImei,
+                    exception.getMessage()
+                );
+                return;
+            }
             LOGGER.info(
                 "Updated device externalDeviceId from SMS reply. deviceId='{}', phone='{}', imei='{}', smsMessageId='{}', receivedAt='{}'",
                 device.getId(),
@@ -106,11 +117,6 @@ public class DeviceImeiService {
     }
 
     private Optional<Device> resolveDeviceByPhone(String phone) {
-        Optional<Device> exact = deviceRepository.findByPhoneNumber(phone);
-        if (exact.isPresent()) {
-            return exact;
-        }
-
         String normalizedPhone = normalizePhone(phone);
         if (!StringUtils.hasText(normalizedPhone)) {
             return Optional.empty();
@@ -120,6 +126,7 @@ public class DeviceImeiService {
             .filter(device -> isPhoneMatch(normalizedPhone, normalizePhone(device.getPhoneNumber())))
             .sorted(Comparator
                 .comparing((Device device) -> StringUtils.hasText(device.getExternalDeviceId()))
+                .thenComparing((Device device) -> !normalizedPhone.equals(normalizePhone(device.getPhoneNumber())))
                 .thenComparing(Device::getId, Comparator.nullsLast(Comparator.reverseOrder())))
             .findFirst();
     }

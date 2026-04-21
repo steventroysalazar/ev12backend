@@ -117,7 +117,10 @@ public class DeviceImeiService {
         }
 
         return deviceRepository.findAll().stream()
-            .filter(device -> normalizedPhone.equals(normalizePhone(device.getPhoneNumber())))
+            .filter(device -> isPhoneMatch(normalizedPhone, normalizePhone(device.getPhoneNumber())))
+            .sorted(Comparator
+                .comparing((Device device) -> StringUtils.hasText(device.getExternalDeviceId()))
+                .thenComparing(Device::getId, Comparator.nullsLast(Comparator.reverseOrder())))
             .findFirst();
     }
 
@@ -129,10 +132,28 @@ public class DeviceImeiService {
         return matcher.group(1);
     }
 
+    private boolean isPhoneMatch(String incoming, String stored) {
+        if (!StringUtils.hasText(incoming) || !StringUtils.hasText(stored)) {
+            return false;
+        }
+
+        if (incoming.equals(stored)) {
+            return true;
+        }
+
+        int suffixLength = 10;
+        if (incoming.length() >= suffixLength && stored.length() >= suffixLength) {
+            return incoming.substring(incoming.length() - suffixLength)
+                .equals(stored.substring(stored.length() - suffixLength));
+        }
+
+        return false;
+    }
+
     private String normalizePhone(String phone) {
         if (!StringUtils.hasText(phone)) {
             return null;
         }
-        return phone.replaceAll("[^0-9+]", "");
+        return phone.replaceAll("\\D", "");
     }
 }

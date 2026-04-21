@@ -66,6 +66,31 @@ class DeviceImeiServiceTest {
         verify(deviceRepository).save(any(Device.class));
     }
 
+
+    @Test
+    void processReplies_matchesPhoneWithDifferentFormattingAndUpdatesNewestPendingDevice() {
+        Device older = new Device();
+        ReflectionTestUtils.setField(older, "id", 2L);
+        older.setPhoneNumber("+1 (555) 123-4567");
+        older.setExternalDeviceId("already-set");
+
+        Device newestPending = new Device();
+        ReflectionTestUtils.setField(newestPending, "id", 9L);
+        newestPending.setPhoneNumber("15551234567");
+
+        when(deviceRepository.findByPhoneNumber("+15551234567")).thenReturn(Optional.empty());
+        when(deviceRepository.findAll()).thenReturn(List.of(older, newestPending));
+
+        service.processReplies(List.of(new GatewayReplyMessage(
+            303L,
+            "+15551234567",
+            "IMEI:862667084205114\nGSM signal quality: 19",
+            1710000010000L
+        )));
+
+        verify(deviceRepository).save(eq(newestPending));
+    }
+
     @Test
     void processReplies_ignoresMessagesWithoutImei() {
         service.processReplies(List.of(new GatewayReplyMessage(

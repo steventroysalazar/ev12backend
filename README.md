@@ -396,6 +396,57 @@ List devices for all users under a location.
 
 ---
 
+## IMEI SMS auto-link flow (frontend integration)
+
+When a new device is created (`POST /api/users/{userId}/devices` or `POST /api/devices`):
+1. Backend immediately sends SMS command `V?` (uppercase) to that device phone number.
+2. Backend background poller checks gateway inbound replies every ~30 seconds.
+3. If reply text contains `IMEI:<value>` or `IMEI=<value>`, backend saves that value into `externalDeviceId` for the matching device phone number.
+
+### Manual retry endpoint (resend `V?`)
+
+Use this if automatic IMEI request or reply processing fails:
+
+### `POST /api/devices/{deviceId}/imei-resend`
+
+Sends `V?` to a specific device again.
+
+**Response**
+```json
+{
+  "success": true,
+  "deviceId": 12,
+  "phoneNumber": "+15551234567",
+  "command": "V?",
+  "sentAt": "2026-04-21T09:35:00Z"
+}
+```
+
+### Frontend polling example after device create
+
+```ts
+const created = await api.post(`/api/users/${userId}/devices`, {
+  name: 'Tracker 01',
+  phoneNumber: '+15551234567'
+}).then(r => r.data);
+
+// backend is now auto-sending V? and polling replies in background
+
+const waitForImei = async (deviceId: number) => {
+  for (let i = 0; i < 20; i++) {
+    const device = await api.get(`/api/devices/${deviceId}`).then(r => r.data);
+    if (device.externalDeviceId) return device.externalDeviceId;
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  throw new Error('IMEI not linked yet');
+};
+
+// optional manual retry button
+await api.post(`/api/devices/${created.id}/imei-resend`);
+```
+
+---
+
 ## Device Settings Defaults (for frontend prefill/reference)
 
 Use this section to pre-populate frontend device settings when a device is first added.

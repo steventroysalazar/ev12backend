@@ -5,6 +5,7 @@ import com.example.smsbackend.dto.GatewayRequestOptions;
 import com.example.smsbackend.dto.InboundMessageResponse;
 import com.example.smsbackend.dto.DeviceConfigStatusResponse;
 import com.example.smsbackend.dto.ResendConfigResponse;
+import com.example.smsbackend.dto.ResendImeiResponse;
 import com.example.smsbackend.dto.SendConfigRequest;
 import com.example.smsbackend.dto.SendConfigResponse;
 import com.example.smsbackend.dto.SendMessageRequest;
@@ -12,6 +13,7 @@ import com.example.smsbackend.dto.SentMessageResponse;
 import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.service.DeviceCommandService;
+import com.example.smsbackend.service.DeviceImeiService;
 import com.example.smsbackend.service.DeviceTelemetryLogService;
 import com.example.smsbackend.service.GatewayClientService;
 import com.example.smsbackend.service.UserDeviceService;
@@ -44,19 +46,22 @@ public class DeviceConfigController {
     private final GatewayClientService gatewayClientService;
     private final DeviceRepository deviceRepository;
     private final DeviceTelemetryLogService deviceTelemetryLogService;
+    private final DeviceImeiService deviceImeiService;
 
     public DeviceConfigController(
         UserDeviceService userDeviceService,
         DeviceCommandService deviceCommandService,
         GatewayClientService gatewayClientService,
         DeviceRepository deviceRepository,
-        DeviceTelemetryLogService deviceTelemetryLogService
+        DeviceTelemetryLogService deviceTelemetryLogService,
+        DeviceImeiService deviceImeiService
     ) {
         this.userDeviceService = userDeviceService;
         this.deviceCommandService = deviceCommandService;
         this.gatewayClientService = gatewayClientService;
         this.deviceRepository = deviceRepository;
         this.deviceTelemetryLogService = deviceTelemetryLogService;
+        this.deviceImeiService = deviceImeiService;
     }
 
     @PostMapping("/send-config")
@@ -148,6 +153,29 @@ public class DeviceConfigController {
             device.getConfigStatus(),
             device.getConfigLastSentAt(),
             smsBodies.stream().map(SentMessageResponse::new).toList()
+        ));
+    }
+
+
+    @PostMapping("/devices/{deviceId}/imei-resend")
+    public ResponseEntity<ResendImeiResponse> resendImeiLookup(
+        @PathVariable Long deviceId,
+        @RequestHeader(value = "X-Gateway-Base-Url", required = false) String gatewayBaseUrl,
+        @RequestHeader(value = "Authorization", required = false) String gatewayToken,
+        @RequestHeader(value = "X-Gateway-Token", required = false) String legacyGatewayToken
+    ) {
+        Device device = userDeviceService.getDevice(deviceId);
+        String resolvedToken = gatewayToken != null && !gatewayToken.isBlank() ? gatewayToken : legacyGatewayToken;
+        GatewayRequestOptions options = new GatewayRequestOptions(gatewayBaseUrl, resolvedToken);
+
+        deviceImeiService.requestImei(device, options);
+
+        return ResponseEntity.ok(new ResendImeiResponse(
+            true,
+            device.getId(),
+            device.getPhoneNumber(),
+            deviceImeiService.imeiRequestCommand(),
+            Instant.now()
         ));
     }
 

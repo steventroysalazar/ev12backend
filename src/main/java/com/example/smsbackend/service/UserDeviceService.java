@@ -49,6 +49,7 @@ public class UserDeviceService {
     private final CompanyRepository companyRepository;
     private final ObjectMapper objectMapper;
     private final DeviceTelemetryLogService deviceTelemetryLogService;
+    private final DeviceImeiService deviceImeiService;
 
     public UserDeviceService(
         AppUserRepository appUserRepository,
@@ -56,7 +57,8 @@ public class UserDeviceService {
         LocationRepository locationRepository,
         CompanyRepository companyRepository,
         ObjectMapper objectMapper,
-        DeviceTelemetryLogService deviceTelemetryLogService
+        DeviceTelemetryLogService deviceTelemetryLogService,
+        DeviceImeiService deviceImeiService
     ) {
         this.appUserRepository = appUserRepository;
         this.deviceRepository = deviceRepository;
@@ -64,6 +66,7 @@ public class UserDeviceService {
         this.companyRepository = companyRepository;
         this.objectMapper = objectMapper;
         this.deviceTelemetryLogService = deviceTelemetryLogService;
+        this.deviceImeiService = deviceImeiService;
     }
 
     @Transactional(readOnly = true)
@@ -245,6 +248,11 @@ public class UserDeviceService {
         device.setExternalDeviceId(trimOrNull(request.externalDeviceId()));
         device.setProtocolConfig(toProtocolSettingsJson(null));
         Device saved = deviceRepository.save(device);
+        try {
+            deviceImeiService.requestImei(saved, null);
+        } catch (Exception exception) {
+            LOGGER.warn("Device created but failed to send IMEI request SMS for deviceId={}: {}", saved.getId(), exception.getMessage());
+        }
         return toDeviceResponse(saved);
     }
 
@@ -316,6 +324,11 @@ public class UserDeviceService {
         }
 
         Device saved = deviceRepository.save(device);
+        try {
+            deviceImeiService.requestImei(saved, null);
+        } catch (Exception exception) {
+            LOGGER.warn("Device created but failed to send IMEI request SMS for deviceId={}: {}", saved.getId(), exception.getMessage());
+        }
         return toDeviceResponse(saved);
     }
 

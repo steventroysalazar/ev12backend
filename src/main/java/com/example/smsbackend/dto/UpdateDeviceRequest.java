@@ -9,6 +9,7 @@ public class UpdateDeviceRequest {
     private String name;
     private String phoneNumber;
     private String externalDeviceId;
+    private String simIccid;
     private Long userId;
     private Long locationId;
     private Boolean clearLocation;
@@ -29,12 +30,14 @@ public class UpdateDeviceRequest {
         String name,
         String phoneNumber,
         String externalDeviceId,
+        String simIccid,
         Long userId,
         DeviceProtocolSettings protocolSettings
     ) {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.externalDeviceId = externalDeviceId;
+        this.simIccid = simIccid;
         this.userId = userId;
         this.protocolSettings = protocolSettings;
     }
@@ -49,6 +52,10 @@ public class UpdateDeviceRequest {
 
     public String externalDeviceId() {
         return externalDeviceId;
+    }
+
+    public String simIccid() {
+        return simIccid;
     }
 
     public Long userId() {
@@ -94,6 +101,11 @@ public class UpdateDeviceRequest {
     @JsonAlias("external_device_id")
     public void setExternalDeviceId(String externalDeviceId) {
         this.externalDeviceId = externalDeviceId;
+    }
+
+    @JsonAlias("sim_iccid")
+    public void setSimIccid(String simIccid) {
+        this.simIccid = simIccid;
     }
 
     @JsonAlias("user_id")

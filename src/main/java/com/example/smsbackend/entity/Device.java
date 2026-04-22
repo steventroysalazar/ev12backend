@@ -29,6 +29,18 @@ public class Device {
     @Column(name = "external_device_id", length = 64, unique = true)
     private String externalDeviceId;
 
+    @Column(name = "sim_iccid", length = 64)
+    private String simIccid;
+
+    @Column(name = "sim_status", length = 32)
+    private String simStatus;
+
+    @Column(name = "sim_activated", nullable = false)
+    private boolean simActivated = false;
+
+    @Column(name = "sim_status_updated_at")
+    private Instant simStatusUpdatedAt;
+
     @Column(name = "alarm_code", length = 64)
     private String alarmCode;
 
@@ -107,6 +119,38 @@ public class Device {
 
     public void setExternalDeviceId(String externalDeviceId) {
         this.externalDeviceId = externalDeviceId;
+    }
+
+    public String getSimIccid() {
+        return simIccid;
+    }
+
+    public void setSimIccid(String simIccid) {
+        this.simIccid = simIccid;
+    }
+
+    public String getSimStatus() {
+        return simStatus;
+    }
+
+    public void setSimStatus(String simStatus) {
+        this.simStatus = simStatus;
+    }
+
+    public boolean isSimActivated() {
+        return simActivated;
+    }
+
+    public void setSimActivated(boolean simActivated) {
+        this.simActivated = simActivated;
+    }
+
+    public Instant getSimStatusUpdatedAt() {
+        return simStatusUpdatedAt;
+    }
+
+    public void setSimStatusUpdatedAt(Instant simStatusUpdatedAt) {
+        this.simStatusUpdatedAt = simStatusUpdatedAt;
     }
 
     public String getAlarmCode() {

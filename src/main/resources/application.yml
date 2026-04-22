@@ -27,3 +27,14 @@ webhook:
   ev12-token: ${WEBHOOK_EV12_TOKEN:}
   ev12-persist-events: ${WEBHOOK_EV12_PERSIST_EVENTS:false}
   ev12-in-memory-events-max: ${WEBHOOK_EV12_IN_MEMORY_EVENTS_MAX:1000}
+
+cisco:
+  control-center:
+    enabled: ${CISCO_CC_ENABLED:false}
+    host: ${CISCO_CC_HOST:}
+    username: ${CISCO_CC_USERNAME:}
+    api-key: ${CISCO_CC_API_KEY:}
+    device-details-path: ${CISCO_CC_DEVICE_DETAILS_PATH:/rws/api/v1/devices/{iccid}}
+    activate-path: ${CISCO_CC_ACTIVATE_PATH:/rws/api/v1/devices/{iccid}/activate}
+    deactivate-path: ${CISCO_CC_DEACTIVATE_PATH:/rws/api/v1/devices/{iccid}/deactivate}
+    timeout-ms: ${CISCO_CC_TIMEOUT_MS:30000}

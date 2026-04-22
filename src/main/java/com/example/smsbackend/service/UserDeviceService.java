@@ -7,6 +7,9 @@ import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
 import com.example.smsbackend.dto.LocationLookupResponse;
+import com.example.smsbackend.dto.SimBulkActivationRequest;
+import com.example.smsbackend.dto.SimBulkActivationResult;
+import com.example.smsbackend.dto.SimStatusResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
 import com.example.smsbackend.dto.UpdateUserRequest;
 import com.example.smsbackend.dto.UserLookupResponse;
@@ -50,6 +53,7 @@ public class UserDeviceService {
     private final ObjectMapper objectMapper;
     private final DeviceTelemetryLogService deviceTelemetryLogService;
     private final DeviceImeiService deviceImeiService;
+    private final CiscoControlCenterService ciscoControlCenterService;
 
     public UserDeviceService(
         AppUserRepository appUserRepository,
@@ -58,7 +62,8 @@ public class UserDeviceService {
         CompanyRepository companyRepository,
         ObjectMapper objectMapper,
         DeviceTelemetryLogService deviceTelemetryLogService,
-        DeviceImeiService deviceImeiService
+        DeviceImeiService deviceImeiService,
+        CiscoControlCenterService ciscoControlCenterService
     ) {
         this.appUserRepository = appUserRepository;
         this.deviceRepository = deviceRepository;
@@ -67,6 +72,7 @@ public class UserDeviceService {
         this.objectMapper = objectMapper;
         this.deviceTelemetryLogService = deviceTelemetryLogService;
         this.deviceImeiService = deviceImeiService;
+        this.ciscoControlCenterService = ciscoControlCenterService;
     }
 
     @Transactional(readOnly = true)
@@ -246,6 +252,7 @@ public class UserDeviceService {
         device.setName(request.name().trim());
         device.setPhoneNumber(request.phoneNumber().trim());
         device.setExternalDeviceId(trimOrNull(request.externalDeviceId()));
+        device.setSimIccid(trimOrNull(request.simIccid()));
         device.setProtocolConfig(toProtocolSettingsJson(null));
         Device saved = deviceRepository.save(device);
         try {
@@ -271,6 +278,10 @@ public class UserDeviceService {
 
         if (request.externalDeviceId() != null) {
             device.setExternalDeviceId(trimOrNull(request.externalDeviceId()));
+        }
+
+        if (request.simIccid() != null) {
+            device.setSimIccid(trimOrNull(request.simIccid()));
         }
 
         if (request.protocolSettings() != null) {
@@ -330,6 +341,55 @@ public class UserDeviceService {
             LOGGER.warn("Device created but failed to send IMEI request SMS for deviceId={}: {}", saved.getId(), exception.getMessage());
         }
         return toDeviceResponse(saved);
+    }
+
+    @Transactional
+    public SimStatusResponse refreshSimStatus(Long deviceId) {
+        Device device = getDevice(deviceId);
+        if (!StringUtils.hasText(device.getSimIccid())) {
+            throw new IllegalArgumentException("Device does not have simIccid. Update device.simIccid first.");
+        }
+        CiscoControlCenterService.CiscoDeviceDetails details = ciscoControlCenterService.fetchDeviceDetails(device.getSimIccid());
+        applySimDetails(device, details);
+        deviceRepository.save(device);
+        return toSimStatusResponse(device);
+    }
+
+    @Transactional
+    public SimStatusResponse setSimActivation(Long deviceId, boolean activate) {
+        Device device = getDevice(deviceId);
+        if (!StringUtils.hasText(device.getSimIccid())) {
+            throw new IllegalArgumentException("Device does not have simIccid. Update device.simIccid first.");
+        }
+        if (activate) {
+            ciscoControlCenterService.activateSim(device.getSimIccid());
+        } else {
+            ciscoControlCenterService.deactivateSim(device.getSimIccid());
+        }
+        try {
+            CiscoControlCenterService.CiscoDeviceDetails details = ciscoControlCenterService.fetchDeviceDetails(device.getSimIccid());
+            applySimDetails(device, details);
+        } catch (Exception ignored) {
+            device.setSimActivated(activate);
+            device.setSimStatus(activate ? "ACTIVATED" : "DEACTIVATED");
+            device.setSimStatusUpdatedAt(Instant.now());
+        }
+        deviceRepository.save(device);
+        return toSimStatusResponse(device);
+    }
+
+    @Transactional
+    public List<SimBulkActivationResult> bulkSetSimActivation(SimBulkActivationRequest request) {
+        return request.deviceIds().stream()
+            .map(deviceId -> {
+                try {
+                    SimStatusResponse status = setSimActivation(deviceId, request.activate());
+                    return new SimBulkActivationResult(deviceId, true, null, status);
+                } catch (Exception exception) {
+                    return new SimBulkActivationResult(deviceId, false, exception.getMessage(), null);
+                }
+            })
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -418,6 +478,10 @@ public class UserDeviceService {
             device.getName(),
             device.getPhoneNumber(),
             device.getExternalDeviceId(),
+            device.getSimIccid(),
+            device.getSimStatus(),
+            device.isSimActivated(),
+            device.getSimStatusUpdatedAt(),
             device.getAlarmCode(),
             device.getAlarmTriggeredAt(),
             device.getAlarmCancelledAt(),
@@ -432,6 +496,27 @@ public class UserDeviceService {
             device.getConfigStatus(),
             device.getConfigLastSentAt(),
             device.getConfigAppliedAt()
+        );
+    }
+
+    private void applySimDetails(Device device, CiscoControlCenterService.CiscoDeviceDetails details) {
+        device.setSimIccid(trimOrNull(details.iccid()));
+        if (StringUtils.hasText(details.msisdn())) {
+            device.setPhoneNumber(details.msisdn().trim());
+        }
+        device.setSimStatus(trimOrNull(details.status()));
+        device.setSimActivated(details.activated());
+        device.setSimStatusUpdatedAt(Instant.now());
+    }
+
+    private SimStatusResponse toSimStatusResponse(Device device) {
+        return new SimStatusResponse(
+            device.getId(),
+            device.getSimIccid(),
+            device.getPhoneNumber(),
+            device.getSimStatus(),
+            device.isSimActivated(),
+            device.getSimStatusUpdatedAt()
         );
     }
 

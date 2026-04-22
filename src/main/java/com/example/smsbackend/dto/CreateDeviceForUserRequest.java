@@ -7,6 +7,7 @@ public record CreateDeviceForUserRequest(
     @NotNull Long userId,
     @NotBlank String name,
     @NotBlank String phoneNumber,
-    String externalDeviceId
+    String externalDeviceId,
+    String simIccid
 ) {
 }

@@ -53,11 +53,14 @@ class UserDeviceServiceTest {
     @Mock
     private DeviceImeiService deviceImeiService;
 
+    @Mock
+    private CiscoControlCenterService ciscoControlCenterService;
+
     private UserDeviceService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, companyRepository, new ObjectMapper(), deviceTelemetryLogService, deviceImeiService);
+        service = new UserDeviceService(appUserRepository, deviceRepository, locationRepository, companyRepository, new ObjectMapper(), deviceTelemetryLogService, deviceImeiService, ciscoControlCenterService);
     }
 
     @Test
@@ -215,7 +218,7 @@ class UserDeviceServiceTest {
         when(appUserRepository.findById(8L)).thenReturn(Optional.of(newUser));
         when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", "862667084205114", 8L, new DeviceProtocolSettings(
+        var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", "862667084205114", null, 8L, new DeviceProtocolSettings(
             java.util.List.of(new DeviceContactSettings(1, true, true, "123456789", "Emma")),
             "860000000000001", "1.0.5",
             "123456789", 1, true, true, "Emma", "123456", true, true, false, false, true, false,

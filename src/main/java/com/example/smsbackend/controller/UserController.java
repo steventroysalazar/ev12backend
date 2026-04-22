@@ -5,6 +5,9 @@ import com.example.smsbackend.dto.DeviceAlarmLogResponse;
 import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.CreateDeviceRequest;
 import com.example.smsbackend.dto.DeviceResponse;
+import com.example.smsbackend.dto.SimBulkActivationRequest;
+import com.example.smsbackend.dto.SimBulkActivationResult;
+import com.example.smsbackend.dto.SimStatusResponse;
 import com.example.smsbackend.dto.UpdateDeviceRequest;
 import com.example.smsbackend.dto.UpdateUserRequest;
 import com.example.smsbackend.dto.UserResponse;
@@ -60,7 +63,7 @@ public class UserController {
 
     @PostMapping("/devices")
     public ResponseEntity<DeviceResponse> createDeviceForUser(@Valid @RequestBody CreateDeviceForUserRequest request) {
-        CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber(), request.externalDeviceId());
+        CreateDeviceRequest createDeviceRequest = new CreateDeviceRequest(request.name(), request.phoneNumber(), request.externalDeviceId(), request.simIccid());
         return ResponseEntity.ok(userDeviceService.createDevice(request.userId(), createDeviceRequest));
     }
 
@@ -90,6 +93,29 @@ public class UserController {
     @GetMapping("/devices")
     public ResponseEntity<List<DeviceResponse>> listDevices() {
         return ResponseEntity.ok(userDeviceService.listAllDevices());
+    }
+
+
+    @PostMapping("/devices/{deviceId}/sim/activate")
+    public ResponseEntity<SimStatusResponse> activateSim(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.setSimActivation(deviceId, true));
+    }
+
+    @PostMapping("/devices/{deviceId}/sim/deactivate")
+    public ResponseEntity<SimStatusResponse> deactivateSim(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.setSimActivation(deviceId, false));
+    }
+
+    @PostMapping("/devices/sim/bulk")
+    public ResponseEntity<List<SimBulkActivationResult>> bulkSetSimActivation(
+        @Valid @RequestBody SimBulkActivationRequest request
+    ) {
+        return ResponseEntity.ok(userDeviceService.bulkSetSimActivation(request));
+    }
+
+    @GetMapping("/devices/{deviceId}/sim/status")
+    public ResponseEntity<SimStatusResponse> refreshSimStatus(@PathVariable Long deviceId) {
+        return ResponseEntity.ok(userDeviceService.refreshSimStatus(deviceId));
     }
 
     @GetMapping("/devices/{deviceId}/alarm-logs")

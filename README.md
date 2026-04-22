@@ -1077,3 +1077,165 @@ Distinct active `alarmCode` values.
 
 ### `GET /api/lookups/alert-logs`
 Distinct filters from alert logs.
+
+---
+
+## SIM activation/deactivation (Cisco Control Center)
+
+This backend now supports SIM lifecycle management per device plus bulk activation/deactivation.
+
+### 1) New device SIM fields
+Every `DeviceResponse` now includes:
+- `simIccid` (string | null)
+- `simStatus` (string | null)
+- `simActivated` (boolean)
+- `simStatusUpdatedAt` (ISO date-time | null)
+
+> `simIccid` is required for Cisco lookup/activation/deactivation endpoints.
+
+### 2) Configure Cisco Control Center credentials
+Set these env vars in backend runtime:
+
+- `CISCO_CC_ENABLED=true`
+- `CISCO_CC_HOST=your-control-center-host`
+- `CISCO_CC_USERNAME=your_username`
+- `CISCO_CC_API_KEY=your_api_key`
+- Optional overrides:
+  - `CISCO_CC_DEVICE_DETAILS_PATH=/rws/api/v1/devices/{iccid}`
+  - `CISCO_CC_ACTIVATE_PATH=/rws/api/v1/devices/{iccid}/activate`
+  - `CISCO_CC_DEACTIVATE_PATH=/rws/api/v1/devices/{iccid}/deactivate`
+  - `CISCO_CC_TIMEOUT_MS=30000`
+
+### 3) Backend endpoints
+
+#### Refresh SIM status from Cisco
+`GET /api/devices/{deviceId}/sim/status`
+
+Returns:
+```json
+{
+  "deviceId": 101,
+  "simIccid": "8988216716970004975",
+  "msisdn": "882351697004975",
+  "status": "ACTIVATED",
+  "activated": true,
+  "updatedAt": "2026-04-22T10:15:30Z"
+}
+```
+
+#### Activate one SIM
+`POST /api/devices/{deviceId}/sim/activate`
+
+#### Deactivate one SIM
+`POST /api/devices/{deviceId}/sim/deactivate`
+
+Both return `SimStatusResponse`.
+
+#### Bulk activate/deactivate
+`POST /api/devices/sim/bulk`
+
+Request:
+```json
+{
+  "deviceIds": [101, 102, 103],
+  "activate": true
+}
+```
+
+Response (per-device success/failure):
+```json
+[
+  {
+    "deviceId": 101,
+    "success": true,
+    "error": null,
+    "status": {
+      "deviceId": 101,
+      "simIccid": "8988216716970004975",
+      "msisdn": "882351697004975",
+      "status": "ACTIVATED",
+      "activated": true,
+      "updatedAt": "2026-04-22T10:15:30Z"
+    }
+  },
+  {
+    "deviceId": 102,
+    "success": false,
+    "error": "Device does not have simIccid. Update device.simIccid first.",
+    "status": null
+  }
+]
+```
+
+---
+
+## Frontend integration guide (React/TypeScript)
+
+### Device create/update payload
+When creating or editing devices, include `simIccid` so SIM APIs can work:
+
+```ts
+await api.post('/api/devices', {
+  userId,
+  name,
+  phoneNumber,
+  externalDeviceId,
+  simIccid, // required for Cisco SIM controls
+});
+```
+
+```ts
+await api.patch(`/api/devices/${deviceId}`, {
+  simIccid,
+});
+```
+
+### Show SIM node on device card/table
+Use these fields from `DeviceResponse`:
+- `simActivated` for badge/toggle state
+- `simStatus` for raw provider status text
+- `simStatusUpdatedAt` for "last synced"
+
+Example:
+```ts
+const isSmsUsable = device.simActivated;
+```
+
+### Single-device actions
+```ts
+export async function activateSim(deviceId: number) {
+  return api.post(`/api/devices/${deviceId}/sim/activate`).then(r => r.data);
+}
+
+export async function deactivateSim(deviceId: number) {
+  return api.post(`/api/devices/${deviceId}/sim/deactivate`).then(r => r.data);
+}
+
+export async function refreshSimStatus(deviceId: number) {
+  return api.get(`/api/devices/${deviceId}/sim/status`).then(r => r.data);
+}
+```
+
+### Bulk actions
+```ts
+export async function bulkSetSimActivation(deviceIds: number[], activate: boolean) {
+  return api.post('/api/devices/sim/bulk', { deviceIds, activate }).then(r => r.data);
+}
+```
+
+Recommended UX:
+1. User selects N devices.
+2. Click **Bulk Activate** or **Bulk Deactivate**.
+3. Call `/api/devices/sim/bulk`.
+4. Show result counters: success/fail.
+5. For failed rows show `error` text and allow retry.
+
+### SMS usability guard in UI
+Disable SMS command buttons when SIM is inactive:
+```ts
+const canSendSms = device.simActivated === true;
+```
+
+If disabled, show helper text:
+> "SIM is not activated. Activate SIM to enable SMS features."
+

@@ -377,4 +377,28 @@ class UserDeviceServiceTest {
         device.setConfigStatus(UserDeviceService.CONFIG_STATUS_APPLIED);
         assertFalse(service.canResend(device, Instant.parse("2026-03-12T09:40:00Z")));
     }
+
+    @Test
+    void saveDeviceProtocolSettings_mergesWithExistingConfig() {
+        Device device = new Device();
+        device.setProtocolConfig("""
+            {"micVolume":55,"speakerVolume":65,"fallDownSensitivity":4}
+            """);
+
+        when(deviceRepository.save(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.saveDeviceProtocolSettings(device, new DeviceProtocolSettings(
+            null,
+            null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null,
+            70, null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null
+        ));
+
+        assertTrue(device.getProtocolConfig().contains("\"micVolume\":70"));
+        assertTrue(device.getProtocolConfig().contains("\"speakerVolume\":65"));
+        assertTrue(device.getProtocolConfig().contains("\"fallDownSensitivity\":4"));
+    }
 }

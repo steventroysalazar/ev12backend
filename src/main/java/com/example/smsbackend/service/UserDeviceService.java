@@ -24,7 +24,9 @@ import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
@@ -521,7 +523,11 @@ public class UserDeviceService {
     }
 
     public void saveDeviceProtocolSettings(Device device, DeviceProtocolSettings settings) {
-        device.setProtocolConfig(toProtocolSettingsJson(settings));
+        DeviceProtocolSettings mergedSettings = mergeProtocolSettings(fromProtocolSettingsJson(device.getProtocolConfig()), settings);
+        if (mergedSettings == null) {
+            return;
+        }
+        device.setProtocolConfig(toProtocolSettingsJson(mergedSettings));
         deviceRepository.save(device);
     }
 
@@ -573,6 +579,26 @@ public class UserDeviceService {
         } catch (JsonProcessingException exception) {
             LOGGER.warn("Unable to parse protocol settings JSON for device response: {}", exception.getMessage());
             return null;
+        }
+    }
+
+    private DeviceProtocolSettings mergeProtocolSettings(DeviceProtocolSettings existing, DeviceProtocolSettings incoming) {
+        if (incoming == null) {
+            return existing;
+        }
+        try {
+            ObjectNode mergedNode = existing == null
+                ? objectMapper.createObjectNode()
+                : (ObjectNode) objectMapper.valueToTree(existing);
+            JsonNode incomingNode = objectMapper.valueToTree(incoming);
+            incomingNode.fields().forEachRemaining(entry -> {
+                if (!entry.getValue().isNull()) {
+                    mergedNode.set(entry.getKey(), entry.getValue());
+                }
+            });
+            return objectMapper.treeToValue(mergedNode, DeviceProtocolSettings.class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("Unable to merge protocol settings.", exception);
         }
     }
 }

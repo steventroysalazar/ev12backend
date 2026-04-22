@@ -72,7 +72,7 @@ public record SendConfigRequest(
 
     public DeviceProtocolSettings toDeviceProtocolSettings() {
         return new DeviceProtocolSettings(
-            normalizedContacts(),
+            persistedContacts(),
             imei,
             eviewVersion,
             contactNumber,
@@ -133,6 +133,24 @@ public record SendConfigRequest(
             stepDetectionInterval,
             checkStatus
         );
+    }
+
+    private List<DeviceContactSettings> persistedContacts() {
+        if (contacts != null && !contacts.isEmpty()) {
+            return contacts;
+        }
+
+        if (!StringUtils.hasText(contactNumber)) {
+            return null;
+        }
+
+        return List.of(new DeviceContactSettings(
+            contactSlot,
+            contactSmsEnabled,
+            contactCallEnabled,
+            contactNumber,
+            contactName
+        ));
     }
 
     public List<DeviceContactSettings> normalizedContacts() {

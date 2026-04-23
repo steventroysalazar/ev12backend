@@ -1,6 +1,8 @@
 package com.example.smsbackend.controller;
 
+import com.example.smsbackend.service.ErrorLogService;
 import com.example.smsbackend.service.GatewayClientException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -18,12 +20,19 @@ public class ApiExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    private final ErrorLogService errorLogService;
+
+    public ApiExceptionHandler(ErrorLogService errorLogService) {
+        this.errorLogService = errorLogService;
+    }
+
     @ExceptionHandler(GatewayClientException.class)
-    public ResponseEntity<Map<String, Object>> handleGateway(GatewayClientException e) {
+    public ResponseEntity<Map<String, Object>> handleGateway(GatewayClientException e, HttpServletRequest request) {
         HttpStatus status = HttpStatus.resolve(e.getStatusCode());
         if (status == null) {
             status = HttpStatus.BAD_GATEWAY;
         }
+        persistError(e, status, request);
 
         return ResponseEntity.status(status).body(Map.of(
             "success", false,
@@ -33,7 +42,8 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException e) {
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException e, HttpServletRequest request) {
+        persistError(e, HttpStatus.BAD_REQUEST, request);
         return ResponseEntity.badRequest().body(Map.of(
             "success", false,
             "error", "Validation failed",
@@ -45,7 +55,12 @@ public class ApiExceptionHandler {
 
 
     @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException e) {
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.BAD_REQUEST;
+        }
+        persistError(e, status, request);
         return ResponseEntity.status(e.getStatusCode()).body(Map.of(
             "success", false,
             "error", e.getReason() != null ? e.getReason() : "Request failed"
@@ -53,10 +68,11 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e, HttpServletRequest request) {
         HttpStatus status = e.getMessage() != null && e.getMessage().toLowerCase().contains("not found")
             ? HttpStatus.NOT_FOUND
             : HttpStatus.BAD_REQUEST;
+        persistError(e, status, request);
         return ResponseEntity.status(status).body(Map.of(
             "success", false,
             "error", e.getMessage()
@@ -64,8 +80,9 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(DataAccessException.class)
-    public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException e) {
+    public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException e, HttpServletRequest request) {
         LOGGER.error("Database error while handling API request.", e);
+        persistError(e, HttpStatus.SERVICE_UNAVAILABLE, request);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
             "success", false,
             "error", "Database unavailable",
@@ -75,10 +92,15 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception e) {
+    public ResponseEntity<Map<String, Object>> handleGeneral(Exception e, HttpServletRequest request) {
+        persistError(e, HttpStatus.BAD_GATEWAY, request);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
             "success", false,
             "error", e.getMessage()
         ));
+    }
+
+    private void persistError(Exception e, HttpStatus status, HttpServletRequest request) {
+        errorLogService.logError(e, status.value(), request.getMethod(), request.getRequestURI());
     }
 }

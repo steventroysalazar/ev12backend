@@ -303,6 +303,51 @@ const alertLogActionOptions = alertLogFilters.actions.map((action: string) => ({
 
 ---
 
+
+### `GET /api/error-logs`
+Returns recent backend API errors captured by global exception handling.
+
+**Query params**
+- `limit` (optional, default `100`, max `500`)
+
+**Example response**
+```json
+[
+  {
+    "id": 71,
+    "method": "POST",
+    "path": "/api/devices/999/commands",
+    "statusCode": 400,
+    "errorType": "IllegalArgumentException",
+    "errorMessage": "Device not found",
+    "stackTrace": "java.lang.IllegalArgumentException: Device not found...",
+    "occurredAt": "2026-04-23T14:26:55.001Z"
+  }
+]
+```
+
+### Frontend feed example for error logs
+
+```ts
+// fetch latest backend errors for an admin/dev diagnostics screen
+const errorLogs = await api
+  .get('/api/error-logs', { params: { limit: 150 } })
+  .then(r => r.data);
+
+// render-ready shape
+const rows = errorLogs.map((log: any) => ({
+  id: log.id,
+  when: new Date(log.occurredAt).toLocaleString(),
+  route: `${log.method} ${log.path}`,
+  status: log.statusCode,
+  type: log.errorType,
+  message: log.errorMessage,
+  stackTrace: log.stackTrace
+}));
+```
+
+---
+
 ## Company APIs
 
 ### `POST /api/companies`

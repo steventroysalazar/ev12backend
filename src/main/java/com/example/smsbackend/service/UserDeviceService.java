@@ -6,6 +6,7 @@ import com.example.smsbackend.dto.DeviceAlarmLogResponse;
 import com.example.smsbackend.dto.DeviceLocationBreadcrumbResponse;
 import com.example.smsbackend.dto.DeviceProtocolSettings;
 import com.example.smsbackend.dto.DeviceResponse;
+import com.example.smsbackend.dto.GeoFenceSetting;
 import com.example.smsbackend.dto.LocationLookupResponse;
 import com.example.smsbackend.dto.SimBulkActivationRequest;
 import com.example.smsbackend.dto.SimBulkActivationResult;
@@ -31,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -287,7 +289,11 @@ public class UserDeviceService {
         }
 
         if (request.protocolSettings() != null) {
-            device.setProtocolConfig(toProtocolSettingsJson(request.protocolSettings()));
+            DeviceProtocolSettings mergedSettings = mergeProtocolSettings(
+                fromProtocolSettingsJson(device.getProtocolConfig()),
+                request.protocolSettings()
+            );
+            device.setProtocolConfig(toProtocolSettingsJson(mergedSettings));
         }
 
         if (request.userId() != null) {
@@ -564,7 +570,7 @@ public class UserDeviceService {
 
     private String toProtocolSettingsJson(DeviceProtocolSettings settings) {
         try {
-            return objectMapper.writeValueAsString(settings);
+            return objectMapper.writeValueAsString(normalizeProtocolSettings(settings));
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Unable to store protocol settings.", exception);
         }
@@ -575,7 +581,7 @@ public class UserDeviceService {
             return null;
         }
         try {
-            return objectMapper.readValue(value, DeviceProtocolSettings.class);
+            return normalizeProtocolSettings(objectMapper.readValue(value, DeviceProtocolSettings.class));
         } catch (JsonProcessingException exception) {
             LOGGER.warn("Unable to parse protocol settings JSON for device response: {}", exception.getMessage());
             return null;
@@ -600,5 +606,101 @@ public class UserDeviceService {
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Unable to merge protocol settings.", exception);
         }
+    }
+
+    private DeviceProtocolSettings normalizeProtocolSettings(DeviceProtocolSettings settings) {
+        if (settings == null) {
+            return null;
+        }
+
+        List<GeoFenceSetting> normalizedGeoFences = settings.geoFences() == null
+            ? null
+            : settings.geoFences().stream()
+                .filter(item -> item != null && item.slot() != null)
+                .limit(4)
+                .map(item -> new GeoFenceSetting(
+                    item.slot(),
+                    normalizeBinaryFlag(item.enabled()),
+                    item.mode(),
+                    item.radius()
+                ))
+                .toList();
+
+        return new DeviceProtocolSettings(
+            settings.contacts(),
+            settings.imei(),
+            settings.eviewVersion(),
+            settings.contactNumber(),
+            settings.contactSlot(),
+            settings.contactSmsEnabled(),
+            settings.contactCallEnabled(),
+            settings.contactName(),
+            settings.smsPassword(),
+            settings.smsWhitelistEnabled(),
+            settings.requestLocation(),
+            settings.requestGpsLocation(),
+            settings.requestLbsLocation(),
+            normalizeBinaryFlag(settings.wifiEnabled()),
+            settings.bluetoothEnabled(),
+            settings.micVolume(),
+            settings.speakerVolume(),
+            settings.vibrationEnabled(),
+            settings.beepEnabled(),
+            settings.prefixEnabled(),
+            settings.prefixName(),
+            settings.checkBattery(),
+            settings.sosMode(),
+            settings.sosActionTime(),
+            settings.sosCallRingTime(),
+            settings.sosCallTalkTime(),
+            settings.fallDownEnabled(),
+            settings.fallDownSensitivity(),
+            settings.fallDownCall(),
+            settings.noMotionEnabled(),
+            settings.noMotionTime(),
+            settings.noMotionCall(),
+            settings.motionEnabled(),
+            settings.motionStaticTime(),
+            settings.motionDurationTime(),
+            settings.motionCall(),
+            settings.overSpeedEnabled(),
+            settings.overSpeedLimit(),
+            settings.geoFenceEnabled(),
+            settings.geoFenceMode(),
+            settings.geoFenceRadius(),
+            settings.apnEnabled(),
+            settings.apn(),
+            settings.serverEnabled(),
+            settings.serverHost(),
+            settings.serverPort(),
+            settings.gprsEnabled(),
+            settings.workingMode(),
+            settings.workingModeInterval(),
+            settings.workingModeNoMotionInterval(),
+            settings.continuousLocateInterval(),
+            settings.continuousLocateDuration(),
+            settings.timeZone(),
+            settings.turnOffDevice(),
+            settings.findMyDevice(),
+            settings.heartRateEnabled(),
+            settings.heartRateInterval(),
+            settings.stepDetectionEnabled(),
+            settings.stepDetectionInterval(),
+            settings.checkStatus(),
+            settings.authorizedNumbers(),
+            normalizedGeoFences
+        );
+    }
+
+    private String normalizeBinaryFlag(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "1", "true", "yes", "on", "y" -> "1";
+            case "0", "false", "no", "off", "n" -> "0";
+            default -> value.trim();
+        };
     }
 }

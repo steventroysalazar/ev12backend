@@ -221,11 +221,11 @@ class UserDeviceServiceTest {
         var response = service.updateDevice(9L, new UpdateDeviceRequest("Renamed", "222", "862667084205114", null, 8L, new DeviceProtocolSettings(
             java.util.List.of(new DeviceContactSettings(1, true, true, "123456789", "Emma")),
             "860000000000001", "1.0.5",
-            "123456789", 1, true, true, "Emma", "123456", true, true, false, false, true, false,
+            "123456789", 1, true, true, "Emma", "123456", true, true, false, false, "1", false,
             10, 90, true, true, true, "Emma", true, 1, 20, "35S", "20M", true, 5, true, true,
             "80M", true, false, null, null, null, true, "100km/h", true, 0, "100m", true,
             "internet", true, "www.smart-locator.com", 6060, true, "mode2", "03M", "01H",
-            "10S", "600S", "+1", false, true, true, "10M", true, "10M", true
+            "10S", "600S", "+1", false, true, true, "10M", true, "10M", true, null, null
         )));
 
         assertEquals(9L, response.id());
@@ -394,7 +394,7 @@ class UserDeviceServiceTest {
             70, null, null, null, null, null, null, null, null, null, null,
             null, null, null, null, null, null, null, null, null, null, null, null, null, null,
             null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null
+            null, null, null, null, null, null, null, null
         ));
 
         assertTrue(device.getProtocolConfig().contains("\"micVolume\":70"));

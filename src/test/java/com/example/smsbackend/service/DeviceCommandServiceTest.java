@@ -80,6 +80,8 @@ class DeviceCommandServiceTest {
             null,
             null,
             null,
+            null,
+            null,
             null
         );
 
@@ -103,6 +105,8 @@ class DeviceCommandServiceTest {
             true,
             true,
             "Emma",
+            null,
+            null,
             null,
             null,
             null,

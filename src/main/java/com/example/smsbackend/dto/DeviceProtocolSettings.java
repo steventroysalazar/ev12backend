@@ -1,5 +1,6 @@
 package com.example.smsbackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import java.util.List;
 
 public record DeviceProtocolSettings(
@@ -16,7 +17,8 @@ public record DeviceProtocolSettings(
     Boolean requestLocation,
     Boolean requestGpsLocation,
     Boolean requestLbsLocation,
-    Boolean wifiEnabled,
+    @JsonAlias({"wifi_enabled", "wifiPositioning", "wifi_positioning"})
+    String wifiEnabled,
     Boolean bluetoothEnabled,
     Integer micVolume,
     Integer speakerVolume,
@@ -62,6 +64,10 @@ public record DeviceProtocolSettings(
     String heartRateInterval,
     Boolean stepDetectionEnabled,
     String stepDetectionInterval,
-    Boolean checkStatus
+    Boolean checkStatus,
+    @JsonAlias({"authorized_numbers", "whitelistedNumbers", "whitelisted_numbers"})
+    List<String> authorizedNumbers,
+    @JsonAlias("geo_fences")
+    List<GeoFenceSetting> geoFences
 ) {
 }

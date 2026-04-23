@@ -1,5 +1,6 @@
 package com.example.smsbackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,7 @@ public record SendConfigRequest(
     Boolean requestLocation,
     Boolean requestGpsLocation,
     Boolean requestLbsLocation,
+    @JsonAlias({"wifi_enabled", "wifiPositioning", "wifi_positioning"})
     Boolean wifiEnabled,
     Boolean bluetoothEnabled,
     Integer micVolume,
@@ -67,7 +69,11 @@ public record SendConfigRequest(
     String heartRateInterval,
     Boolean stepDetectionEnabled,
     String stepDetectionInterval,
-    Boolean checkStatus
+    Boolean checkStatus,
+    @JsonAlias({"authorized_numbers", "whitelistedNumbers", "whitelisted_numbers"})
+    List<String> authorizedNumbers,
+    @JsonAlias("geo_fences")
+    List<GeoFenceSetting> geoFences
 ) {
 
     public DeviceProtocolSettings toDeviceProtocolSettings() {
@@ -85,7 +91,7 @@ public record SendConfigRequest(
             requestLocation,
             requestGpsLocation,
             requestLbsLocation,
-            wifiEnabled,
+            wifiEnabled == null ? null : (wifiEnabled ? "1" : "0"),
             bluetoothEnabled,
             micVolume,
             speakerVolume,
@@ -131,7 +137,9 @@ public record SendConfigRequest(
             heartRateInterval,
             stepDetectionEnabled,
             stepDetectionInterval,
-            checkStatus
+            checkStatus,
+            authorizedNumbers,
+            geoFences
         );
     }
 

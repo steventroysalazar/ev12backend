@@ -13,6 +13,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -41,6 +42,11 @@ public class AppUser {
 
     @Column(length = 255)
     private String address;
+
+    @Column(length = 512)
+    private String fcmToken;
+
+    private Instant fcmTokenUpdatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -115,6 +121,22 @@ public class AppUser {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getFcmToken() {
+        return fcmToken;
+    }
+
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
+
+    public Instant getFcmTokenUpdatedAt() {
+        return fcmTokenUpdatedAt;
+    }
+
+    public void setFcmTokenUpdatedAt(Instant fcmTokenUpdatedAt) {
+        this.fcmTokenUpdatedAt = fcmTokenUpdatedAt;
     }
 
     public UserRole getRole() {

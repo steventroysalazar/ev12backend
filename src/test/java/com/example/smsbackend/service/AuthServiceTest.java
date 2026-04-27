@@ -14,6 +14,7 @@ import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
+import com.example.smsbackend.repository.LoginLogRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +39,14 @@ class AuthServiceTest {
     @Mock
     private DeviceRepository deviceRepository;
 
+    @Mock
+    private LoginLogRepository loginLogRepository;
+
     private AuthService service;
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(appUserRepository, companyRepository, locationRepository, deviceRepository);
+        service = new AuthService(appUserRepository, companyRepository, locationRepository, deviceRepository, loginLogRepository);
     }
 
     @Test

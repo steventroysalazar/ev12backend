@@ -2,12 +2,11 @@ package com.example.smsbackend.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 
-public record LoginRequest(
+public record LogoutRequest(
+    Long userId,
     @Email String email,
     @JsonAlias("username") String username,
-    @NotBlank String password,
     @JsonAlias("grant_type") String grantType,
     String scope,
     @JsonAlias("os_type") String osType,

@@ -40,7 +40,18 @@ public class AuthController {
         String forwardedFor = servletRequest.getHeader("X-Forwarded-For");
         String ipAddress = forwardedFor != null ? forwardedFor.split(",")[0].trim() : servletRequest.getRemoteAddr();
         String userAgent = servletRequest.getHeader("User-Agent");
-        return ResponseEntity.ok(authService.login(request, new LoginAuditContext(ipAddress, userAgent)));
+        LoginRequest enrichedRequest = new LoginRequest(
+            request.email(),
+            request.username(),
+            request.password(),
+            firstNonBlank(request.grantType(), header(servletRequest, "X-Grant-Type", "grant_type", "grant-type")),
+            firstNonBlank(request.scope(), header(servletRequest, "X-Scope", "scope")),
+            firstNonBlank(request.osType(), header(servletRequest, "X-OS-Type", "os_type", "os-type")),
+            firstNonBlank(request.apiVersion(), header(servletRequest, "X-API-Version", "api_version", "api-version")),
+            firstNonBlank(request.deviceId(), header(servletRequest, "X-Device-Id", "device_id", "device-id"))
+        );
+
+        return ResponseEntity.ok(authService.login(enrichedRequest, new LoginAuditContext(ipAddress, userAgent)));
     }
 
     @PostMapping("/fcm-token")
@@ -51,5 +62,25 @@ public class AuthController {
     @GetMapping("/login-logs")
     public ResponseEntity<List<LoginLogResponse>> listLoginLogs(@RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(authService.listLoginLogs(userId));
+    }
+
+    private String header(HttpServletRequest request, String... names) {
+        for (String name : names) {
+            String value = request.getHeader(name);
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String primaryValue, String fallbackValue) {
+        if (primaryValue != null && !primaryValue.isBlank()) {
+            return primaryValue.trim();
+        }
+        if (fallbackValue != null && !fallbackValue.isBlank()) {
+            return fallbackValue.trim();
+        }
+        return null;
     }
 }

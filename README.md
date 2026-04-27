@@ -104,6 +104,15 @@ Authenticate and return auth payload.
 - `password`
 - send one of: `email` or `username` (both map to user email lookup)
 
+**You can also send audit fields via headers**
+- Body fields still work and take priority.
+- If body field is missing, backend reads from headers:
+  - `X-Grant-Type` (or `grant_type`)
+  - `X-Scope` (or `scope`)
+  - `X-OS-Type` (or `os_type`)
+  - `X-API-Version` (or `api_version`)
+  - `X-Device-Id` (or `device_id`)
+
 **Response shape**
 ```json
 {
@@ -1135,6 +1144,7 @@ Example:
 - Required: `password` and one of `email` or `username`.
 - Response now includes `loginContext` for audit visibility.
 - Successful logins are persisted and can be read from `GET /api/auth/login-logs` (optional `userId` filter).
+- Audit fields can be passed either in JSON body or headers (`X-Grant-Type`, `X-Scope`, `X-OS-Type`, `X-API-Version`, `X-Device-Id`).
 
 ### `POST /api/auth/fcm-token`
 Persist frontend/device FCM token.

@@ -2,16 +2,23 @@ package com.example.smsbackend.service;
 
 import com.example.smsbackend.dto.AuthResponse;
 import com.example.smsbackend.dto.CreateUserRequest;
+import com.example.smsbackend.dto.FcmTokenResponse;
+import com.example.smsbackend.dto.LoginAuditContext;
+import com.example.smsbackend.dto.LoginContextResponse;
+import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
+import com.example.smsbackend.dto.UpsertFcmTokenRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
 import com.example.smsbackend.entity.Company;
 import com.example.smsbackend.entity.Device;
+import com.example.smsbackend.entity.LoginLog;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.entity.UserRole;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
+import com.example.smsbackend.repository.LoginLogRepository;
 import com.example.smsbackend.repository.LocationRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -32,18 +39,21 @@ public class AuthService {
     private final CompanyRepository companyRepository;
     private final LocationRepository locationRepository;
     private final DeviceRepository deviceRepository;
+    private final LoginLogRepository loginLogRepository;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
         AppUserRepository appUserRepository,
         CompanyRepository companyRepository,
         LocationRepository locationRepository,
-        DeviceRepository deviceRepository
+        DeviceRepository deviceRepository,
+        LoginLogRepository loginLogRepository
     ) {
         this.appUserRepository = appUserRepository;
         this.companyRepository = companyRepository;
         this.locationRepository = locationRepository;
         this.deviceRepository = deviceRepository;
+        this.loginLogRepository = loginLogRepository;
     }
 
     @Transactional
@@ -92,8 +102,9 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest request) {
-        AppUser user = appUserRepository.findByEmailIgnoreCase(request.email().trim())
+    public AuthResponse login(LoginRequest request, LoginAuditContext auditContext) {
+        String identifier = resolveLoginIdentifier(request);
+        AppUser user = appUserRepository.findByEmailIgnoreCase(identifier)
             .orElseThrow(() -> new IllegalArgumentException("Invalid email or password."));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -105,9 +116,62 @@ public class AuthService {
             }
         }
 
+        Instant loggedAt = Instant.now();
+        logSuccessfulLogin(user, request, identifier, auditContext, loggedAt);
+
         String tokenRaw = user.getEmail() + ":" + Instant.now().toEpochMilli();
         String token = Base64.getEncoder().encodeToString(tokenRaw.getBytes(StandardCharsets.UTF_8));
-        return new AuthResponse(true, token, toUserResponse(user));
+        return new AuthResponse(
+            true,
+            token,
+            toUserResponse(user),
+            new LoginContextResponse(
+                identifier,
+                trimOrNull(request.grantType()),
+                trimOrNull(request.scope()),
+                trimOrNull(request.osType()),
+                trimOrNull(request.apiVersion()),
+                trimOrNull(request.deviceId()),
+                trimOrNull(auditContext.ipAddress()),
+                trimOrNull(auditContext.userAgent()),
+                loggedAt
+            )
+        );
+    }
+
+    @Transactional
+    public FcmTokenResponse upsertFcmToken(UpsertFcmTokenRequest request) {
+        AppUser user = appUserRepository.findById(request.userId())
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        user.setFcmToken(request.fcmToken().trim());
+        user.setFcmTokenUpdatedAt(Instant.now());
+        appUserRepository.save(user);
+
+        return new FcmTokenResponse(true, user.getId(), trimOrNull(request.deviceId()), user.getFcmTokenUpdatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoginLogResponse> listLoginLogs(Long userId) {
+        List<LoginLog> logs = userId == null
+            ? loginLogRepository.findTop200ByOrderByCreatedAtDesc()
+            : loginLogRepository.findTop200ByUserIdOrderByCreatedAtDesc(userId);
+
+        return logs.stream()
+            .map(log -> new LoginLogResponse(
+                log.getId(),
+                log.getUser() != null ? log.getUser().getId() : null,
+                log.getLoginIdentifier(),
+                log.getGrantType(),
+                log.getScope(),
+                log.getOsType(),
+                log.getApiVersion(),
+                log.getDeviceId(),
+                log.getIpAddress(),
+                log.getUserAgent(),
+                log.getCreatedAt()
+            ))
+            .toList();
     }
 
     public static UserResponse toUserResponse(AppUser user) {
@@ -202,5 +266,37 @@ public class AuthService {
             return null;
         }
         return value.trim();
+    }
+
+    private String resolveLoginIdentifier(LoginRequest request) {
+        String identifier = trimOrNull(request.email());
+        if (identifier == null) {
+            identifier = trimOrNull(request.username());
+        }
+        if (identifier == null) {
+            throw new IllegalArgumentException("email (or username) is required.");
+        }
+        return identifier.toLowerCase();
+    }
+
+    private void logSuccessfulLogin(
+        AppUser user,
+        LoginRequest request,
+        String identifier,
+        LoginAuditContext auditContext,
+        Instant loggedAt
+    ) {
+        LoginLog log = new LoginLog();
+        log.setUser(user);
+        log.setLoginIdentifier(identifier);
+        log.setGrantType(trimOrNull(request.grantType()));
+        log.setScope(trimOrNull(request.scope()));
+        log.setOsType(trimOrNull(request.osType()));
+        log.setApiVersion(trimOrNull(request.apiVersion()));
+        log.setDeviceId(trimOrNull(request.deviceId()));
+        log.setIpAddress(trimOrNull(auditContext.ipAddress()));
+        log.setUserAgent(trimOrNull(auditContext.userAgent()));
+        log.setCreatedAt(loggedAt);
+        loginLogRepository.save(log);
     }
 }

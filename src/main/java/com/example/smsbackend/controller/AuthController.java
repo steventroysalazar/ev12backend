@@ -6,6 +6,8 @@ import com.example.smsbackend.dto.FcmTokenResponse;
 import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
+import com.example.smsbackend.dto.LogoutRequest;
+import com.example.smsbackend.dto.LogoutResponse;
 import com.example.smsbackend.dto.UpsertFcmTokenRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.service.AuthService;
@@ -59,7 +61,25 @@ public class AuthController {
         return ResponseEntity.ok(authService.upsertFcmToken(request));
     }
 
-    @GetMapping("/login-logs")
+    @PostMapping("/logout")
+    public ResponseEntity<LogoutResponse> logout(@RequestBody LogoutRequest request, HttpServletRequest servletRequest) {
+        String forwardedFor = servletRequest.getHeader("X-Forwarded-For");
+        String ipAddress = forwardedFor != null ? forwardedFor.split(",")[0].trim() : servletRequest.getRemoteAddr();
+        String userAgent = servletRequest.getHeader("User-Agent");
+        LogoutRequest enrichedRequest = new LogoutRequest(
+            request.userId(),
+            request.email(),
+            request.username(),
+            firstNonBlank(request.grantType(), header(servletRequest, "X-Grant-Type", "grant_type", "grant-type")),
+            firstNonBlank(request.scope(), header(servletRequest, "X-Scope", "scope")),
+            firstNonBlank(request.osType(), header(servletRequest, "X-OS-Type", "os_type", "os-type")),
+            firstNonBlank(request.apiVersion(), header(servletRequest, "X-API-Version", "api_version", "api-version")),
+            firstNonBlank(request.deviceId(), header(servletRequest, "X-Device-Id", "device_id", "device-id"))
+        );
+        return ResponseEntity.ok(authService.logout(enrichedRequest, new LoginAuditContext(ipAddress, userAgent)));
+    }
+
+    @GetMapping({"/login-logs", "/logs"})
     public ResponseEntity<List<LoginLogResponse>> listLoginLogs(@RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(authService.listLoginLogs(userId));
     }

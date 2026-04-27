@@ -146,8 +146,8 @@ Authenticate and return auth payload.
 ```
 
 **Audit logging**
-- Every successful login is stored in `login_logs`.
-- Use `GET /api/auth/login-logs` for recent logs (`?userId=7` optional filter).
+- Every successful login and logout is stored in `login_logs` with `eventType` (`LOGIN` or `LOGOUT`).
+- Use `GET /api/auth/logs` (or legacy `GET /api/auth/login-logs`) for recent auth logs (`?userId=7` optional filter).
 
 **Migration compatibility note**
 - If a legacy user record still has plaintext password stored, first successful login auto-upgrades it to bcrypt.
@@ -168,6 +168,24 @@ Save/update a user FCM token after login (for push notifications).
 
 **Required fields**
 - `userId`, `fcm_token`
+
+### `POST /api/auth/logout`
+Log a logout event for audit trail.
+
+**Request body**
+```json
+{
+  "userId": 7,
+  "email": "john@example.com",
+  "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+  "os_type": "iOS",
+  "api_version": "iOS 15"
+}
+```
+
+**Required**
+- send at least one user identifier: `userId` or `email` or `username`
+- audit fields can also come from headers (`X-Grant-Type`, `X-Scope`, `X-OS-Type`, `X-API-Version`, `X-Device-Id`)
 
 ---
 
@@ -1143,7 +1161,7 @@ Example:
 
 - Required: `password` and one of `email` or `username`.
 - Response now includes `loginContext` for audit visibility.
-- Successful logins are persisted and can be read from `GET /api/auth/login-logs` (optional `userId` filter).
+- Successful logins are persisted and can be read from `GET /api/auth/logs` (legacy alias: `GET /api/auth/login-logs`, optional `userId` filter).
 - Audit fields can be passed either in JSON body or headers (`X-Grant-Type`, `X-Scope`, `X-OS-Type`, `X-API-Version`, `X-Device-Id`).
 
 ### `POST /api/auth/fcm-token`
@@ -1159,8 +1177,11 @@ Persist frontend/device FCM token.
 }
 ```
 
-### `GET /api/auth/login-logs`
-Return latest 200 login audit logs (or by `userId`).
+### `POST /api/auth/logout`
+Create logout audit event (`LOGOUT`) with the same context fields/header options as login.
+
+### `GET /api/auth/logs` (alias: `GET /api/auth/login-logs`)
+Return latest 200 auth audit logs (login + logout, optional `userId` filter).
 
 ---
 

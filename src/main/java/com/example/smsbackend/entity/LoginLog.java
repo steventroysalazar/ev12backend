@@ -33,6 +33,9 @@ public class LoginLog {
     @Column(nullable = false, length = 190)
     private String loginIdentifier;
 
+    @Column(nullable = false, length = 20)
+    private String eventType;
+
     @Column(length = 40)
     private String grantType;
 
@@ -75,6 +78,14 @@ public class LoginLog {
 
     public void setLoginIdentifier(String loginIdentifier) {
         this.loginIdentifier = loginIdentifier;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
     }
 
     public String getGrantType() {

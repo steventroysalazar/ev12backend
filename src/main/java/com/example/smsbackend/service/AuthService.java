@@ -7,6 +7,8 @@ import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginContextResponse;
 import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
+import com.example.smsbackend.dto.LogoutRequest;
+import com.example.smsbackend.dto.LogoutResponse;
 import com.example.smsbackend.dto.UpsertFcmTokenRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.entity.AppUser;
@@ -117,7 +119,7 @@ public class AuthService {
         }
 
         Instant loggedAt = Instant.now();
-        logSuccessfulLogin(user, request, identifier, auditContext, loggedAt);
+        logAuthEvent("LOGIN", user, request.grantType(), request.scope(), request.osType(), request.apiVersion(), request.deviceId(), identifier, auditContext, loggedAt);
 
         String tokenRaw = user.getEmail() + ":" + Instant.now().toEpochMilli();
         String token = Base64.getEncoder().encodeToString(tokenRaw.getBytes(StandardCharsets.UTF_8));
@@ -151,6 +153,31 @@ public class AuthService {
         return new FcmTokenResponse(true, user.getId(), trimOrNull(request.deviceId()), user.getFcmTokenUpdatedAt());
     }
 
+    @Transactional
+    public LogoutResponse logout(LogoutRequest request, LoginAuditContext auditContext) {
+        String identifier = resolveLogoutIdentifier(request);
+        AppUser user = resolveLogoutUser(request, identifier);
+
+        Instant loggedAt = Instant.now();
+        logAuthEvent("LOGOUT", user, request.grantType(), request.scope(), request.osType(), request.apiVersion(), request.deviceId(), identifier, auditContext, loggedAt);
+
+        return new LogoutResponse(
+            true,
+            "Logged out successfully.",
+            new LoginContextResponse(
+                identifier,
+                trimOrNull(request.grantType()),
+                trimOrNull(request.scope()),
+                trimOrNull(request.osType()),
+                trimOrNull(request.apiVersion()),
+                trimOrNull(request.deviceId()),
+                trimOrNull(auditContext.ipAddress()),
+                trimOrNull(auditContext.userAgent()),
+                loggedAt
+            )
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<LoginLogResponse> listLoginLogs(Long userId) {
         List<LoginLog> logs = userId == null
@@ -160,6 +187,7 @@ public class AuthService {
         return logs.stream()
             .map(log -> new LoginLogResponse(
                 log.getId(),
+                log.getEventType(),
                 log.getUser() != null ? log.getUser().getId() : null,
                 log.getLoginIdentifier(),
                 log.getGrantType(),
@@ -279,24 +307,55 @@ public class AuthService {
         return identifier.toLowerCase();
     }
 
-    private void logSuccessfulLogin(
+    private void logAuthEvent(
+        String eventType,
         AppUser user,
-        LoginRequest request,
+        String grantType,
+        String scope,
+        String osType,
+        String apiVersion,
+        String deviceId,
         String identifier,
         LoginAuditContext auditContext,
         Instant loggedAt
     ) {
         LoginLog log = new LoginLog();
         log.setUser(user);
+        log.setEventType(eventType);
         log.setLoginIdentifier(identifier);
-        log.setGrantType(trimOrNull(request.grantType()));
-        log.setScope(trimOrNull(request.scope()));
-        log.setOsType(trimOrNull(request.osType()));
-        log.setApiVersion(trimOrNull(request.apiVersion()));
-        log.setDeviceId(trimOrNull(request.deviceId()));
+        log.setGrantType(trimOrNull(grantType));
+        log.setScope(trimOrNull(scope));
+        log.setOsType(trimOrNull(osType));
+        log.setApiVersion(trimOrNull(apiVersion));
+        log.setDeviceId(trimOrNull(deviceId));
         log.setIpAddress(trimOrNull(auditContext.ipAddress()));
         log.setUserAgent(trimOrNull(auditContext.userAgent()));
         log.setCreatedAt(loggedAt);
         loginLogRepository.save(log);
+    }
+
+    private AppUser resolveLogoutUser(LogoutRequest request, String identifier) {
+        if (request.userId() != null) {
+            return appUserRepository.findById(request.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        }
+        return appUserRepository.findByEmailIgnoreCase(identifier)
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+    }
+
+    private String resolveLogoutIdentifier(LogoutRequest request) {
+        String identifier = trimOrNull(request.email());
+        if (identifier == null) {
+            identifier = trimOrNull(request.username());
+        }
+        if (identifier == null && request.userId() != null) {
+            AppUser user = appUserRepository.findById(request.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+            identifier = user.getEmail();
+        }
+        if (identifier == null) {
+            throw new IllegalArgumentException("userId or email (or username) is required.");
+        }
+        return identifier.toLowerCase();
     }
 }

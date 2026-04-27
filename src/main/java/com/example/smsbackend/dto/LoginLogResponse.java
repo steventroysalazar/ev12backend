@@ -4,6 +4,7 @@ import java.time.Instant;
 
 public record LoginLogResponse(
     Long id,
+    String eventType,
     Long userId,
     String loginIdentifier,
     String grantType,

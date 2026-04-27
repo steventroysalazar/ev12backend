@@ -91,15 +91,83 @@ Authenticate and return auth payload.
 ```json
 {
   "email": "john@example.com",
-  "password": "StrongPassword123"
+  "password": "StrongPassword123",
+  "grant_type": "password",
+  "scope": "type:1",
+  "os_type": "iOS",
+  "api_version": "iOS 15",
+  "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03"
 }
 ```
 
 **Required fields**
-- `email`, `password`
+- `password`
+- send one of: `email` or `username` (both map to user email lookup)
+
+**You can also send audit fields via headers**
+- Body fields still work and take priority.
+- If body field is missing, backend reads from headers:
+  - `X-Grant-Type` (or `grant_type`)
+  - `X-Scope` (or `scope`)
+  - `X-OS-Type` (or `os_type`)
+  - `X-API-Version` (or `api_version`)
+  - `X-Device-Id` (or `device_id`)
+
+**Response shape**
+```json
+{
+  "success": true,
+  "token": "<base64-token>",
+  "user": {
+    "id": 7,
+    "email": "john@example.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "contactNumber": "+15550123",
+    "address": "123 Main St",
+    "userRole": 2,
+    "companyId": 1,
+    "locationId": 4,
+    "allCompanyLocations": false,
+    "managedLocationIds": [4, 6]
+  },
+  "loginContext": {
+    "loginIdentifier": "john@example.com",
+    "grantType": "password",
+    "scope": "type:1",
+    "osType": "iOS",
+    "apiVersion": "iOS 15",
+    "deviceId": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+    "ipAddress": "203.0.113.5",
+    "userAgent": "Mozilla/5.0 ...",
+    "loggedAt": "2026-04-27T12:34:56.000Z"
+  }
+}
+```
+
+**Audit logging**
+- Every successful login is stored in `login_logs`.
+- Use `GET /api/auth/login-logs` for recent logs (`?userId=7` optional filter).
 
 **Migration compatibility note**
 - If a legacy user record still has plaintext password stored, first successful login auto-upgrades it to bcrypt.
+
+### `POST /api/auth/fcm-token`
+Save/update a user FCM token after login (for push notifications).
+
+**Request body**
+```json
+{
+  "userId": 7,
+  "fcm_token": "f5Vx....",
+  "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+  "os_type": "iOS",
+  "api_version": "iOS 15"
+}
+```
+
+**Required fields**
+- `userId`, `fcm_token`
 
 ---
 
@@ -1060,6 +1128,40 @@ Notes:
 ### `POST /api/auth/login`
 Authenticate user.
 
+Example:
+```json
+{
+  "email": "john@example.com",
+  "password": "StrongPassword123",
+  "grant_type": "password",
+  "scope": "type:1",
+  "os_type": "iOS",
+  "api_version": "iOS 15",
+  "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03"
+}
+```
+
+- Required: `password` and one of `email` or `username`.
+- Response now includes `loginContext` for audit visibility.
+- Successful logins are persisted and can be read from `GET /api/auth/login-logs` (optional `userId` filter).
+- Audit fields can be passed either in JSON body or headers (`X-Grant-Type`, `X-Scope`, `X-OS-Type`, `X-API-Version`, `X-Device-Id`).
+
+### `POST /api/auth/fcm-token`
+Persist frontend/device FCM token.
+
+```json
+{
+  "userId": 7,
+  "fcm_token": "f5Vx....",
+  "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+  "os_type": "iOS",
+  "api_version": "iOS 15"
+}
+```
+
+### `GET /api/auth/login-logs`
+Return latest 200 login audit logs (or by `userId`).
+
 ---
 
 ## User APIs
@@ -1283,4 +1385,3 @@ const canSendSms = device.simActivated === true;
 
 If disabled, show helper text:
 > "SIM is not activated. Activate SIM to enable SMS features."
-

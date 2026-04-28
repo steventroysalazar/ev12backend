@@ -11,6 +11,7 @@ public record LoginRequest(
     @JsonAlias("grant_type") String grantType,
     String scope,
     @JsonAlias("os_type") String osType,
+    @JsonAlias("os_version") String osVersion,
     @JsonAlias("api_version") String apiVersion,
     @JsonAlias("device_id") String deviceId
 ) {

@@ -95,6 +95,7 @@ Authenticate and return auth payload.
   "grant_type": "password",
   "scope": "type:1",
   "os_type": "iOS",
+  "os_version": "17.4.1",
   "api_version": "iOS 15",
   "device_id": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03"
 }
@@ -110,6 +111,7 @@ Authenticate and return auth payload.
   - `X-Grant-Type` (or `grant_type`)
   - `X-Scope` (or `scope`)
   - `X-OS-Type` (or `os_type`)
+  - `X-OS-Version` (or `os_version`)
   - `X-API-Version` (or `api_version`)
   - `X-Device-Id` (or `device_id`)
 
@@ -149,6 +151,11 @@ Authenticate and return auth payload.
 - Every successful login and logout is stored in `login_logs` with `eventType` (`LOGIN` or `LOGOUT`).
 - Use `GET /api/auth/logs` (or legacy `GET /api/auth/login-logs`) for recent auth logs (`?userId=7` optional filter).
 
+**Device tracking behavior (important for mobile apps)**
+- On every successful login, backend upserts a `user_devices` row keyed by (`user_id`, `device_id`).
+- Saved per-device fields: `device_id`, `os_type`, `os_version`, `api_version`, `last_login`, `created_at`.
+- One user can have multiple rows in `user_devices` (one per device).
+
 **Migration compatibility note**
 - If a legacy user record still has plaintext password stored, first successful login auto-upgrades it to bcrypt.
 
@@ -167,7 +174,12 @@ Save/update a user FCM token after login (for push notifications).
 ```
 
 **Required fields**
-- `userId`, `fcm_token`
+- `userId`, `fcm_token`, `device_id`
+
+**Behavior**
+- Backend looks up the exact `user_devices` row using (`userId`, `device_id`).
+- `fcm_token` is stored on that row so notifications can target a specific device.
+- If no matching `user_devices` row exists, backend returns an error (login must run first on that device).
 
 ### `POST /api/auth/logout`
 Log a logout event for audit trail.
@@ -186,6 +198,56 @@ Log a logout event for audit trail.
 **Required**
 - send at least one user identifier: `userId` or `email` or `username`
 - audit fields can also come from headers (`X-Grant-Type`, `X-Scope`, `X-OS-Type`, `X-API-Version`, `X-Device-Id`)
+
+**Behavior**
+- If `device_id` is provided, backend removes that specific row from `user_devices` for the resolved user.
+- This de-links that device from the user and prevents future push sends from that device record.
+
+---
+
+## Frontend sequence for mobile device tracking
+
+Use this order in your app:
+
+1. **Login** → `POST /api/auth/login`  
+   Send `device_id`, `os_type`, `os_version`, `api_version`.
+2. **Register push token** → `POST /api/auth/fcm-token`  
+   Send `userId` (from login response), same `device_id`, and current `fcm_token`.
+3. **Logout** → `POST /api/auth/logout`  
+   Send `userId` (or email/username) and same `device_id`.
+
+### Example frontend payloads
+
+```ts
+// 1) Login
+await api.post('/api/auth/login', {
+  email,
+  password,
+  grant_type: 'password',
+  scope: 'type:1',
+  os_type: Platform.OS === 'ios' ? 'iOS' : 'Android',
+  os_version: String(DeviceInfo.getSystemVersion?.() ?? ''),
+  api_version: APP_VERSION,
+  device_id: deviceId,
+});
+
+// 2) Save FCM token (after login success)
+await api.post('/api/auth/fcm-token', {
+  userId: auth.user.id,
+  fcm_token: fcmToken,
+  device_id: deviceId,
+  os_type: Platform.OS === 'ios' ? 'iOS' : 'Android',
+  api_version: APP_VERSION,
+});
+
+// 3) Logout
+await api.post('/api/auth/logout', {
+  userId: auth.user.id,
+  device_id: deviceId,
+  os_type: Platform.OS === 'ios' ? 'iOS' : 'Android',
+  api_version: APP_VERSION,
+});
+```
 
 ---
 

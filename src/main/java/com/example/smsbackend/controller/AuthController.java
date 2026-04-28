@@ -49,6 +49,7 @@ public class AuthController {
             firstNonBlank(request.grantType(), header(servletRequest, "X-Grant-Type", "grant_type", "grant-type")),
             firstNonBlank(request.scope(), header(servletRequest, "X-Scope", "scope")),
             firstNonBlank(request.osType(), header(servletRequest, "X-OS-Type", "os_type", "os-type")),
+            firstNonBlank(request.osVersion(), header(servletRequest, "X-OS-Version", "os_version", "os-version")),
             firstNonBlank(request.apiVersion(), header(servletRequest, "X-API-Version", "api_version", "api-version")),
             firstNonBlank(request.deviceId(), header(servletRequest, "X-Device-Id", "device_id", "device-id"))
         );

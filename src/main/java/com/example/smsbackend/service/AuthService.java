@@ -3,6 +3,7 @@ package com.example.smsbackend.service;
 import com.example.smsbackend.dto.AuthResponse;
 import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.dto.FcmTokenResponse;
+import com.example.smsbackend.dto.FcmTokenDetailsResponse;
 import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginContextResponse;
 import com.example.smsbackend.dto.LoginLogResponse;
@@ -17,11 +18,13 @@ import com.example.smsbackend.entity.Device;
 import com.example.smsbackend.entity.LoginLog;
 import com.example.smsbackend.entity.Location;
 import com.example.smsbackend.entity.UserRole;
+import com.example.smsbackend.entity.UserDevice;
 import com.example.smsbackend.repository.AppUserRepository;
 import com.example.smsbackend.repository.CompanyRepository;
 import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.LoginLogRepository;
 import com.example.smsbackend.repository.LocationRepository;
+import com.example.smsbackend.repository.UserDeviceRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -42,6 +45,7 @@ public class AuthService {
     private final LocationRepository locationRepository;
     private final DeviceRepository deviceRepository;
     private final LoginLogRepository loginLogRepository;
+    private final UserDeviceRepository userDeviceRepository;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
@@ -49,13 +53,15 @@ public class AuthService {
         CompanyRepository companyRepository,
         LocationRepository locationRepository,
         DeviceRepository deviceRepository,
-        LoginLogRepository loginLogRepository
+        LoginLogRepository loginLogRepository,
+        UserDeviceRepository userDeviceRepository
     ) {
         this.appUserRepository = appUserRepository;
         this.companyRepository = companyRepository;
         this.locationRepository = locationRepository;
         this.deviceRepository = deviceRepository;
         this.loginLogRepository = loginLogRepository;
+        this.userDeviceRepository = userDeviceRepository;
     }
 
     @Transactional
@@ -120,6 +126,7 @@ public class AuthService {
 
         Instant loggedAt = Instant.now();
         logAuthEvent("LOGIN", user, request.grantType(), request.scope(), request.osType(), request.apiVersion(), request.deviceId(), identifier, auditContext, loggedAt);
+        upsertUserDevice(user, request, loggedAt);
 
         String tokenRaw = user.getEmail() + ":" + Instant.now().toEpochMilli();
         String token = Base64.getEncoder().encodeToString(tokenRaw.getBytes(StandardCharsets.UTF_8));
@@ -146,11 +153,41 @@ public class AuthService {
         AppUser user = appUserRepository.findById(request.userId())
             .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
-        user.setFcmToken(request.fcmToken().trim());
+        String deviceId = trimOrNull(request.deviceId());
+        if (deviceId == null) {
+            throw new IllegalArgumentException("deviceId is required for fcm-token updates.");
+        }
+        UserDevice userDevice = userDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+            .orElseThrow(() -> new IllegalArgumentException("User device not found for this userId and deviceId."));
+        userDevice.setFcmToken(request.fcmToken().trim());
+        userDeviceRepository.save(userDevice);
+
         user.setFcmTokenUpdatedAt(Instant.now());
         appUserRepository.save(user);
 
-        return new FcmTokenResponse(true, user.getId(), trimOrNull(request.deviceId()), user.getFcmTokenUpdatedAt());
+        return new FcmTokenResponse(true, user.getId(), deviceId, user.getFcmTokenUpdatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public FcmTokenDetailsResponse getFcmToken(Long userId, String deviceIdRaw) {
+        AppUser user = appUserRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        String deviceId = trimOrNull(deviceIdRaw);
+        if (deviceId == null) {
+            throw new IllegalArgumentException("deviceId is required.");
+        }
+
+        UserDevice userDevice = userDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+            .orElseThrow(() -> new IllegalArgumentException("User device not found for this userId and deviceId."));
+
+        return new FcmTokenDetailsResponse(
+            true,
+            user.getId(),
+            deviceId,
+            userDevice.getFcmToken(),
+            user.getFcmTokenUpdatedAt()
+        );
     }
 
     @Transactional
@@ -160,6 +197,7 @@ public class AuthService {
 
         Instant loggedAt = Instant.now();
         logAuthEvent("LOGOUT", user, request.grantType(), request.scope(), request.osType(), request.apiVersion(), request.deviceId(), identifier, auditContext, loggedAt);
+        clearUserDevice(user, request.deviceId());
 
         return new LogoutResponse(
             true,
@@ -357,5 +395,32 @@ public class AuthService {
             throw new IllegalArgumentException("userId or email (or username) is required.");
         }
         return identifier.toLowerCase();
+    }
+
+    private void upsertUserDevice(AppUser user, LoginRequest request, Instant loggedAt) {
+        String deviceId = trimOrNull(request.deviceId());
+        if (deviceId == null) {
+            return;
+        }
+        UserDevice userDevice = userDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+            .orElseGet(UserDevice::new);
+        if (userDevice.getId() == null) {
+            userDevice.setUser(user);
+            userDevice.setDeviceId(deviceId);
+            userDevice.setCreatedAt(loggedAt);
+        }
+        userDevice.setOsType(trimOrNull(request.osType()));
+        userDevice.setOsVersion(trimOrNull(request.osVersion()));
+        userDevice.setApiVersion(trimOrNull(request.apiVersion()));
+        userDevice.setLastLogin(loggedAt);
+        userDeviceRepository.save(userDevice);
+    }
+
+    private void clearUserDevice(AppUser user, String requestDeviceId) {
+        String deviceId = trimOrNull(requestDeviceId);
+        if (deviceId == null) {
+            return;
+        }
+        userDeviceRepository.deleteByUserIdAndDeviceId(user.getId(), deviceId);
     }
 }

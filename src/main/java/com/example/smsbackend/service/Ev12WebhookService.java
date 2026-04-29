@@ -4,6 +4,10 @@ import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
 import com.example.smsbackend.dto.WebhookAlarmAttemptResponse;
 import com.example.smsbackend.entity.Ev12WebhookEvent;
+import com.example.smsbackend.dto.DeviceProtocolSettings;
+import com.example.smsbackend.dto.GeoFenceSetting;
+import com.example.smsbackend.entity.Device;
+import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.Ev12WebhookEventRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -41,6 +45,7 @@ public class Ev12WebhookService {
     private final ObjectMapper objectMapper;
     private final AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService;
     private final DeviceLocationUpdateService deviceLocationUpdateService;
+    private final DeviceRepository deviceRepository;
     private final Ev12WebhookEventRepository ev12WebhookEventRepository;
     private final Deque<Ev12WebhookEventResponse> inMemoryEvents = new ArrayDeque<>();
     private final AtomicLong inMemoryEventSequence = new AtomicLong(0);
@@ -50,12 +55,14 @@ public class Ev12WebhookService {
         ObjectMapper objectMapper,
         AlarmCodeUpdateWorkerService alarmCodeUpdateWorkerService,
         DeviceLocationUpdateService deviceLocationUpdateService,
+        DeviceRepository deviceRepository,
         Ev12WebhookEventRepository ev12WebhookEventRepository
     ) {
         this.webhookProperties = webhookProperties;
         this.objectMapper = objectMapper;
         this.alarmCodeUpdateWorkerService = alarmCodeUpdateWorkerService;
         this.deviceLocationUpdateService = deviceLocationUpdateService;
+        this.deviceRepository = deviceRepository;
         this.ev12WebhookEventRepository = ev12WebhookEventRepository;
     }
 
@@ -246,8 +253,8 @@ public class Ev12WebhookService {
                     continue;
                 }
 
-                String nextAlarmCode = deriveAlarmCode(alarmCodeNode);
-                if (nextAlarmCode == null) {
+                AlarmDerivation alarmDerivation = deriveAlarmCode(externalDeviceId, alarmCodeNode);
+                if (!alarmDerivation.hasSignal()) {
                     alarmAttempts.add(new WebhookAlarmAttemptResponse(
                         candidateIndex++,
                         externalDeviceId.trim(),
@@ -261,13 +268,13 @@ public class Ev12WebhookService {
 
                 AlarmCodeUpdateResult updateResult = alarmCodeUpdateWorkerService.applyNow(new AlarmCodeUpdateRequest(
                     externalDeviceId.trim(),
-                    nextAlarmCode,
+                    alarmDerivation.alarmCode(),
                     eventTimestamp
                 ));
                 WebhookAlarmAttemptResponse attempt = new WebhookAlarmAttemptResponse(
                     candidateIndex++,
                     externalDeviceId.trim(),
-                    nextAlarmCode,
+                    alarmDerivation.alarmCode(),
                     eventTimestamp,
                     updateResult.action(),
                     updateResult.reason()
@@ -492,14 +499,24 @@ public class Ev12WebhookService {
         return JsonNodeFactory.instance.missingNode();
     }
 
-    private String deriveAlarmCode(JsonNode alarmCodeNode) {
+    private AlarmDerivation deriveAlarmCode(String externalDeviceId, JsonNode alarmCodeNode) {
         String latestMatch = null;
+        boolean shouldClear = false;
         for (String alarmCodeValue : alarmCodeValues(alarmCodeNode)) {
-            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue) || isMotionLike(alarmCodeValue)) {
+            if (isSosLike(alarmCodeValue) || isFallLike(alarmCodeValue) || isMotionLike(alarmCodeValue) || isGeoFenceLike(alarmCodeValue)) {
                 latestMatch = alarmCodeValue;
             }
+            if (isAlarmEndingLike(alarmCodeValue)) {
+                shouldClear = true;
+            }
         }
-        return latestMatch;
+        if (latestMatch != null) {
+            return new AlarmDerivation(formatGeoFenceAlarmCode(externalDeviceId, latestMatch), true);
+        }
+        if (shouldClear) {
+            return new AlarmDerivation(null, true);
+        }
+        return new AlarmDerivation(null, false);
     }
 
     private String derivePowerLifecycleCode(JsonNode alarmCodeNode) {
@@ -582,6 +599,86 @@ public class Ev12WebhookService {
             return false;
         }
         return value.toLowerCase(Locale.ROOT).contains("power off");
+    }
+
+    private boolean isGeoFenceLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        return value.toUpperCase(Locale.ROOT).matches(".*GEO\\s*[- ]?([1-4]).*ALERT.*");
+    }
+
+    private boolean isAlarmEndingLike(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        return normalized.contains("sos ending")
+            || normalized.contains("sos end")
+            || normalized.matches(".*geo\\s*[- ]?[1-4].*(ending|end|clear|cancel).*");
+    }
+
+    private String formatGeoFenceAlarmCode(String externalDeviceId, String alarmCodeValue) {
+        if (!isGeoFenceLike(alarmCodeValue)) {
+            return alarmCodeValue;
+        }
+        Integer slot = extractGeoFenceSlot(alarmCodeValue);
+        if (slot == null || !StringUtils.hasText(externalDeviceId)) {
+            return alarmCodeValue;
+        }
+        String direction = geoFenceDirectionFor(externalDeviceId, slot);
+        if (!StringUtils.hasText(direction)) {
+            return alarmCodeValue;
+        }
+        return alarmCodeValue + " (" + direction + ")";
+    }
+
+    private Integer extractGeoFenceSlot(String alarmCodeValue) {
+        String normalized = alarmCodeValue.toUpperCase(Locale.ROOT);
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("GEO\\s*[- ]?([1-4])").matcher(normalized);
+        if (!matcher.find()) {
+            return null;
+        }
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    private String geoFenceDirectionFor(String externalDeviceId, Integer slot) {
+        return deviceRepository.findByExternalDeviceId(externalDeviceId.trim())
+            .map(Device::getProtocolConfig)
+            .map(this::readProtocolSettings)
+            .map(DeviceProtocolSettings::geoFences)
+            .flatMap(geoFences -> geoFences.stream()
+                .filter(geoFence -> geoFence != null && slot.equals(geoFence.slot()))
+                .findFirst())
+            .map(GeoFenceSetting::mode)
+            .map(this::normalizeGeoFenceDirection)
+            .orElse(null);
+    }
+
+    private DeviceProtocolSettings readProtocolSettings(String protocolConfig) {
+        if (!StringUtils.hasText(protocolConfig) || "null".equalsIgnoreCase(protocolConfig.trim())) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(protocolConfig, DeviceProtocolSettings.class);
+        } catch (JsonProcessingException exception) {
+            return null;
+        }
+    }
+
+    private String normalizeGeoFenceDirection(String mode) {
+        if (!StringUtils.hasText(mode)) {
+            return null;
+        }
+        String normalized = mode.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "0", "out", "outbound", "exit", "leave" -> "outbound";
+            case "1", "in", "inbound", "enter", "entry" -> "inbound";
+            default -> "mode " + mode.trim();
+        };
+    }
+
+    private record AlarmDerivation(String alarmCode, boolean hasSignal) {
     }
 
     private boolean isDisconnectedStatus(JsonNode root) {

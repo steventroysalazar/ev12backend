@@ -181,6 +181,27 @@ Save/update a user FCM token after login (for push notifications).
 - `fcm_token` is stored on that row so notifications can target a specific device.
 - If no matching `user_devices` row exists, backend returns an error (login must run first on that device).
 
+### `GET /api/auth/fcm-token`
+View the currently saved FCM token for a specific user+device.
+
+**Query params**
+- `userId` (required)
+- `deviceId` (required)
+
+**Example**
+`GET /api/auth/fcm-token?userId=7&deviceId=APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03`
+
+**Response**
+```json
+{
+  "success": true,
+  "userId": 7,
+  "deviceId": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+  "fcmToken": "f5Vx....",
+  "fcmTokenUpdatedAt": "2026-04-28T09:22:11.000Z"
+}
+```
+
 ### `POST /api/auth/logout`
 Log a logout event for audit trail.
 

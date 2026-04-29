@@ -3,6 +3,7 @@ package com.example.smsbackend.controller;
 import com.example.smsbackend.dto.AuthResponse;
 import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.dto.FcmTokenResponse;
+import com.example.smsbackend.dto.FcmTokenDetailsResponse;
 import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
@@ -60,6 +61,14 @@ public class AuthController {
     @PostMapping("/fcm-token")
     public ResponseEntity<FcmTokenResponse> upsertFcmToken(@Valid @RequestBody UpsertFcmTokenRequest request) {
         return ResponseEntity.ok(authService.upsertFcmToken(request));
+    }
+
+    @GetMapping("/fcm-token")
+    public ResponseEntity<FcmTokenDetailsResponse> getFcmToken(
+        @RequestParam Long userId,
+        @RequestParam String deviceId
+    ) {
+        return ResponseEntity.ok(authService.getFcmToken(userId, deviceId));
     }
 
     @PostMapping("/logout")

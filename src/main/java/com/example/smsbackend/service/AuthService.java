@@ -3,6 +3,7 @@ package com.example.smsbackend.service;
 import com.example.smsbackend.dto.AuthResponse;
 import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.dto.FcmTokenResponse;
+import com.example.smsbackend.dto.FcmTokenDetailsResponse;
 import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginContextResponse;
 import com.example.smsbackend.dto.LoginLogResponse;
@@ -165,6 +166,28 @@ public class AuthService {
         appUserRepository.save(user);
 
         return new FcmTokenResponse(true, user.getId(), deviceId, user.getFcmTokenUpdatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public FcmTokenDetailsResponse getFcmToken(Long userId, String deviceIdRaw) {
+        AppUser user = appUserRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        String deviceId = trimOrNull(deviceIdRaw);
+        if (deviceId == null) {
+            throw new IllegalArgumentException("deviceId is required.");
+        }
+
+        UserDevice userDevice = userDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+            .orElseThrow(() -> new IllegalArgumentException("User device not found for this userId and deviceId."));
+
+        return new FcmTokenDetailsResponse(
+            true,
+            user.getId(),
+            deviceId,
+            userDevice.getFcmToken(),
+            user.getFcmTokenUpdatedAt()
+        );
     }
 
     @Transactional

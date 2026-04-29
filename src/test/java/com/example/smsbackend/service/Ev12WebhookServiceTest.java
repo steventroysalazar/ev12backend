@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.example.smsbackend.config.WebhookProperties;
 import com.example.smsbackend.dto.Ev12WebhookEventResponse;
 import com.example.smsbackend.entity.Ev12WebhookEvent;
+import com.example.smsbackend.repository.DeviceRepository;
 import com.example.smsbackend.repository.Ev12WebhookEventRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +41,9 @@ class Ev12WebhookServiceTest {
 
     @Mock
     private DeviceLocationUpdateService deviceLocationUpdateService;
+
+    @Mock
+    private DeviceRepository deviceRepository;
 
     private void mockApplyNowSuccess() {
         when(alarmCodeUpdateWorkerService.applyNow(any())).thenReturn(
@@ -74,6 +78,7 @@ class Ev12WebhookServiceTest {
             objectMapper,
             alarmCodeUpdateWorkerService,
             deviceLocationUpdateService,
+            deviceRepository,
             ev12WebhookEventRepository
         );
     }

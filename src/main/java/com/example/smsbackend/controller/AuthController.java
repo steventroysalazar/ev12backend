@@ -9,6 +9,7 @@ import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
 import com.example.smsbackend.dto.LogoutRequest;
 import com.example.smsbackend.dto.LogoutResponse;
+import com.example.smsbackend.dto.FcmTokenLookupRequest;
 import com.example.smsbackend.dto.UpsertFcmTokenRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.service.AuthService;
@@ -63,11 +64,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.upsertFcmToken(request));
     }
 
-    @GetMapping("/fcm-token")
+    @PostMapping("/fcm-token/list")
     public ResponseEntity<List<FcmTokenDetailsResponse>> getFcmTokens(
-        @RequestParam Long userId
+        @Valid @RequestBody FcmTokenLookupRequest request
     ) {
-        return ResponseEntity.ok(authService.getFcmTokens(userId));
+        return ResponseEntity.ok(authService.getFcmTokens(request.userId()));
     }
 
     @PostMapping("/logout")

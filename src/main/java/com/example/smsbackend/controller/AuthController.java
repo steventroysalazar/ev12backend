@@ -64,11 +64,10 @@ public class AuthController {
     }
 
     @GetMapping("/fcm-token")
-    public ResponseEntity<FcmTokenDetailsResponse> getFcmToken(
-        @RequestParam Long userId,
-        @RequestParam String deviceId
+    public ResponseEntity<List<FcmTokenDetailsResponse>> getFcmTokens(
+        @RequestParam Long userId
     ) {
-        return ResponseEntity.ok(authService.getFcmToken(userId, deviceId));
+        return ResponseEntity.ok(authService.getFcmTokens(userId));
     }
 
     @PostMapping("/logout")

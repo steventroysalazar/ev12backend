@@ -169,25 +169,19 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public FcmTokenDetailsResponse getFcmToken(Long userId, String deviceIdRaw) {
+    public List<FcmTokenDetailsResponse> getFcmTokens(Long userId) {
         AppUser user = appUserRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
-        String deviceId = trimOrNull(deviceIdRaw);
-        if (deviceId == null) {
-            throw new IllegalArgumentException("deviceId is required.");
-        }
-
-        UserDevice userDevice = userDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
-            .orElseThrow(() -> new IllegalArgumentException("User device not found for this userId and deviceId."));
-
-        return new FcmTokenDetailsResponse(
-            true,
-            user.getId(),
-            deviceId,
-            userDevice.getFcmToken(),
-            user.getFcmTokenUpdatedAt()
-        );
+        return userDeviceRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+            .map(userDevice -> new FcmTokenDetailsResponse(
+                true,
+                user.getId(),
+                userDevice.getDeviceId(),
+                userDevice.getFcmToken(),
+                user.getFcmTokenUpdatedAt()
+            ))
+            .toList();
     }
 
     @Transactional

@@ -182,24 +182,32 @@ Save/update a user FCM token after login (for push notifications).
 - If no matching `user_devices` row exists, backend returns an error (login must run first on that device).
 
 ### `GET /api/auth/fcm-token`
-View the currently saved FCM token for a specific user+device.
+View all currently saved FCM tokens for a specific user (across devices).
 
 **Query params**
 - `userId` (required)
-- `deviceId` (required)
 
 **Example**
-`GET /api/auth/fcm-token?userId=7&deviceId=APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03`
+`GET /api/auth/fcm-token?userId=7`
 
 **Response**
 ```json
-{
-  "success": true,
-  "userId": 7,
-  "deviceId": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
-  "fcmToken": "f5Vx....",
-  "fcmTokenUpdatedAt": "2026-04-28T09:22:11.000Z"
-}
+[
+  {
+    "success": true,
+    "userId": 7,
+    "deviceId": "APPLE_IPHONE11_EEB9E30F7CB649D6A7C7385369748D03",
+    "fcmToken": "f5Vx....",
+    "fcmTokenUpdatedAt": "2026-04-28T09:22:11.000Z"
+  },
+  {
+    "success": true,
+    "userId": 7,
+    "deviceId": "ANDROID_PIXEL8_A99E2",
+    "fcmToken": "e1Rk....",
+    "fcmTokenUpdatedAt": "2026-04-28T09:22:11.000Z"
+  }
+]
 ```
 
 ### `POST /api/auth/logout`

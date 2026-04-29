@@ -3,11 +3,13 @@ package com.example.smsbackend.controller;
 import com.example.smsbackend.dto.AuthResponse;
 import com.example.smsbackend.dto.CreateUserRequest;
 import com.example.smsbackend.dto.FcmTokenResponse;
+import com.example.smsbackend.dto.FcmTokenDetailsResponse;
 import com.example.smsbackend.dto.LoginAuditContext;
 import com.example.smsbackend.dto.LoginLogResponse;
 import com.example.smsbackend.dto.LoginRequest;
 import com.example.smsbackend.dto.LogoutRequest;
 import com.example.smsbackend.dto.LogoutResponse;
+import com.example.smsbackend.dto.FcmTokenLookupRequest;
 import com.example.smsbackend.dto.UpsertFcmTokenRequest;
 import com.example.smsbackend.dto.UserResponse;
 import com.example.smsbackend.service.AuthService;
@@ -49,6 +51,7 @@ public class AuthController {
             firstNonBlank(request.grantType(), header(servletRequest, "X-Grant-Type", "grant_type", "grant-type")),
             firstNonBlank(request.scope(), header(servletRequest, "X-Scope", "scope")),
             firstNonBlank(request.osType(), header(servletRequest, "X-OS-Type", "os_type", "os-type")),
+            firstNonBlank(request.osVersion(), header(servletRequest, "X-OS-Version", "os_version", "os-version")),
             firstNonBlank(request.apiVersion(), header(servletRequest, "X-API-Version", "api_version", "api-version")),
             firstNonBlank(request.deviceId(), header(servletRequest, "X-Device-Id", "device_id", "device-id"))
         );
@@ -59,6 +62,13 @@ public class AuthController {
     @PostMapping("/fcm-token")
     public ResponseEntity<FcmTokenResponse> upsertFcmToken(@Valid @RequestBody UpsertFcmTokenRequest request) {
         return ResponseEntity.ok(authService.upsertFcmToken(request));
+    }
+
+    @PostMapping("/fcm-token/list")
+    public ResponseEntity<List<FcmTokenDetailsResponse>> getFcmTokens(
+        @Valid @RequestBody FcmTokenLookupRequest request
+    ) {
+        return ResponseEntity.ok(authService.getFcmTokens(request.userId()));
     }
 
     @PostMapping("/logout")

@@ -652,8 +652,8 @@ public class Ev12WebhookService {
         }
         String normalized = mode.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
-            case "0", "in", "inbound", "enter", "entry" -> "inbound";
-            case "1", "out", "outbound", "exit" -> "outbound";
+            case "0", "out", "outbound", "exit", "leave" -> "outbound";
+            case "1", "in", "inbound", "enter", "entry" -> "inbound";
             default -> "mode " + mode.trim();
         };
     }

@@ -1326,6 +1326,14 @@ Device responses now include `companyId` for easier tenant-aware frontend filter
 
 ---
 
+
+### `GET /api/devices/{deviceId}/location-breadcrumbs`
+Return stored location breadcrumbs for a device (newest first).
+
+Each breadcrumb includes:
+- `latitude`, `longitude`, `capturedAt`, `source`, `gatewayMessageId`
+- `alarmCode`: alarm state on the device at the moment the breadcrumb was created (for example `SOS Alert`, `Fall-Down Alert`, or `null` when no active alarm)
+
 ## Lookup APIs
 
 ### `GET /api/lookups/company-admins`

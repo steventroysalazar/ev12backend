@@ -8,6 +8,8 @@ public record DeviceProtocolSettings(
     List<DeviceContactSettings> contacts,
     @JsonAlias("imei")
     String imei,
+    @JsonAlias({"serial_number", "serialNumber"})
+    String serialNumber,
     @JsonAlias("eview_version")
     String eviewVersion,
     @JsonAlias("contact_number")

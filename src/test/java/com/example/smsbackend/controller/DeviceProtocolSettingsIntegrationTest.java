@@ -96,9 +96,9 @@ class DeviceProtocolSettingsIntegrationTest {
                 "check_status": true,
                 "authorized_numbers": ["+15551111111", "+15552222222", "+15553333333", "+15554444444"],
                 "geo_fences": [
-                  {"slot": 1, "enabled": "1", "mode": "0", "radius": "150"},
-                  {"slot": 2, "enabled": "0", "mode": "1", "radius": "300"},
-                  {"slot": 3, "enabled": "1", "mode": "1", "radius": "500"}
+                  {"slot": 1, "enabled": "1", "mode": "0", "radius": "150", "latitude": 14.5995, "longitude": 120.9842},
+                  {"slot": 2, "enabled": "0", "mode": "1", "radius": "300", "latitude": 14.5547, "longitude": 121.0244},
+                  {"slot": 3, "enabled": "1", "mode": "1", "radius": "500", "latitude": 14.6760, "longitude": 121.0437}
                 ]
               }
             }
@@ -151,9 +151,9 @@ class DeviceProtocolSettingsIntegrationTest {
               "checkStatus": true,
               "authorizedNumbers": ["+15551111111", "+15552222222", "+15553333333", "+15554444444"],
               "geoFences": [
-                {"slot": 1, "enabled": "1", "mode": "0", "radius": "150"},
-                {"slot": 2, "enabled": "0", "mode": "1", "radius": "300"},
-                {"slot": 3, "enabled": "1", "mode": "1", "radius": "500"}
+                {"slot": 1, "enabled": "1", "mode": "0", "radius": "150", "latitude": 14.5995, "longitude": 120.9842},
+                {"slot": 2, "enabled": "0", "mode": "1", "radius": "300", "latitude": 14.5547, "longitude": 121.0244},
+                {"slot": 3, "enabled": "1", "mode": "1", "radius": "500", "latitude": 14.6760, "longitude": 121.0437}
               ]
             }
             """);

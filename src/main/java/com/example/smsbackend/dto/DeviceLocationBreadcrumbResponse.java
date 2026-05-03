@@ -9,6 +9,7 @@ public record DeviceLocationBreadcrumbResponse(
     Double latitude,
     Double longitude,
     String source,
+    String alarmCode,
     Instant capturedAt,
     Long gatewayMessageId
 ) {

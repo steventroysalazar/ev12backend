@@ -61,6 +61,7 @@ public class DeviceTelemetryLogService {
         breadcrumb.setLatitude(latitude);
         breadcrumb.setLongitude(longitude);
         breadcrumb.setSource(source);
+        breadcrumb.setAlarmCode(device.getAlarmCode());
         breadcrumb.setCapturedAt(capturedAt == null ? Instant.now() : capturedAt);
         breadcrumb.setGatewayMessageId(gatewayMessageId);
         deviceLocationBreadcrumbRepository.save(breadcrumb);
@@ -119,6 +120,7 @@ public class DeviceTelemetryLogService {
                 log.getLatitude(),
                 log.getLongitude(),
                 log.getSource(),
+                log.getAlarmCode(),
                 log.getCapturedAt(),
                 log.getGatewayMessageId()
             ))

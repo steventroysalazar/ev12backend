@@ -42,6 +42,9 @@ public class DeviceLocationBreadcrumb {
     @Column(name = "source", nullable = false, length = 32)
     private String source;
 
+    @Column(name = "alarm_code", length = 64)
+    private String alarmCode;
+
     @Column(name = "captured_at", nullable = false)
     private Instant capturedAt;
 
@@ -59,6 +62,8 @@ public class DeviceLocationBreadcrumb {
     public void setLongitude(Double longitude) { this.longitude = longitude; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+    public String getAlarmCode() { return alarmCode; }
+    public void setAlarmCode(String alarmCode) { this.alarmCode = alarmCode; }
     public Instant getCapturedAt() { return capturedAt; }
     public void setCapturedAt(Instant capturedAt) { this.capturedAt = capturedAt; }
     public Long getGatewayMessageId() { return gatewayMessageId; }

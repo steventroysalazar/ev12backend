@@ -622,13 +622,16 @@ public class UserDeviceService {
                     item.slot(),
                     normalizeBinaryFlag(item.enabled()),
                     item.mode(),
-                    item.radius()
+                    item.radius(),
+                    item.latitude(),
+                    item.longitude()
                 ))
                 .toList();
 
         return new DeviceProtocolSettings(
             settings.contacts(),
             settings.imei(),
+            settings.serialNumber(),
             settings.eviewVersion(),
             settings.contactNumber(),
             settings.contactSlot(),

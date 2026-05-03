@@ -14,6 +14,8 @@ public record SendConfigRequest(
     String command,
     @JsonAlias("imei")
     String imei,
+    @JsonAlias({"serial_number", "serialNumber"})
+    String serialNumber,
     @JsonAlias("eview_version")
     String eviewVersion,
     @JsonAlias("contacts")
@@ -142,6 +144,7 @@ public record SendConfigRequest(
         return new DeviceProtocolSettings(
             persistedContacts(),
             imei,
+            serialNumber,
             eviewVersion,
             contactNumber,
             contactSlot,

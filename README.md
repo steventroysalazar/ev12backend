@@ -563,6 +563,8 @@ Update device fields (partial update behavior).
   "externalDeviceId": "862667084205114",
   "userId": 10,
   "protocolSettings": {
+    "imei": "860000000000001",
+    "serialNumber": "SN-ABC-0001",
     "contacts": [
       {
         "slot": 1,
@@ -574,6 +576,16 @@ Update device fields (partial update behavior).
     ],
     "smsPassword": "123456",
     "requestLocation": true,
+    "geoFences": [
+      {
+        "slot": 1,
+        "enabled": "1",
+        "mode": "1",
+        "radius": "150",
+        "latitude": 14.5995,
+        "longitude": 120.9842
+      }
+    ],
     "workingMode": "mode2",
     "timeZone": "+1"
   }
@@ -584,6 +596,7 @@ Update device fields (partial update behavior).
 - Any provided field is updated.
 - `userId` reassigns the device.
 - `protocolSettings` persists EV protocol profile on the device record.
+- `protocolSettings.serialNumber` is supported (aliases accepted: `serialNumber`, `serial_number`).
 - `externalDeviceId` links the API device to EV12 webhook payload `deviceId`.
 - Device responses now include `companyId` (derived from the assigned user).
 - Device responses include alarm tracking fields for frontend state:
@@ -603,6 +616,7 @@ Update device fields (partial update behavior).
   - `configLastSentAt`: UTC timestamp of the last configuration SMS send
   - `configAppliedAt`: UTC timestamp when a device reply confirmed config applied
 - `contacts` supports up to 10 entries (`A1..A10`).
+- `geoFences[]` supports geofence coordinates per slot via `latitude` and `longitude` (aliases accepted: `lat`, `lng`/`lon`).
 - Legacy single-contact fields are still accepted in protocol settings (`contactNumber`, `contactSlot`, `contactSmsEnabled`, `contactCallEnabled`, `contactName`).
 
 ---

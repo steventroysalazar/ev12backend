@@ -52,6 +52,11 @@ public class UserController {
         return ResponseEntity.ok(userDeviceService.updateUser(userId, request));
     }
 
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<UserResponse> getUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(userDeviceService.getUserById(userId));
+    }
+
     @PostMapping("/users/{userId}/devices")
     public ResponseEntity<DeviceResponse> createDevice(
         @PathVariable Long userId,

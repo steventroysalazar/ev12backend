@@ -142,6 +142,13 @@ public class UserDeviceService {
         return AuthService.toUserResponse(user);
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long userId) {
+        AppUser user = appUserRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        return AuthService.toUserResponse(user);
+    }
+
     @Transactional
     public UserResponse updateUser(Long userId, UpdateUserRequest request) {
         AppUser user = appUserRepository.findById(userId)

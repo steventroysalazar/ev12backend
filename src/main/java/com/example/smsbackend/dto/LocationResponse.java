@@ -7,6 +7,7 @@ public record LocationResponse(
     String name,
     String details,
     Long companyId,
+    boolean geofenceEnabled,
     JsonNode alarmReceiverConfig,
     long usersCount,
     long devicesCount

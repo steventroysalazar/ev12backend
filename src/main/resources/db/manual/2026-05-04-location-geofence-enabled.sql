@@ -1,0 +1,2 @@
+ALTER TABLE locations
+ADD COLUMN geofence_enabled BOOLEAN NOT NULL DEFAULT FALSE;

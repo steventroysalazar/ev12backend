@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 public record CreateLocationRequest(
     @NotBlank String name,
     String details,
-    @NotNull Long companyId
+    @NotNull Long companyId,
+    Boolean geofenceEnabled
 ) {
 }

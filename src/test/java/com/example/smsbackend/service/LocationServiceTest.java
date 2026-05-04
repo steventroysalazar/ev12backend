@@ -61,10 +61,11 @@ class LocationServiceTest {
         when(appUserRepository.findByLocationId(11L)).thenReturn(java.util.List.of());
         when(deviceRepository.countByUserLocationId(11L)).thenReturn(0L);
 
-        var response = service.updateLocation(11L, new UpdateLocationRequest("New HQ", "", null));
+        var response = service.updateLocation(11L, new UpdateLocationRequest("New HQ", "", null, true));
 
         assertEquals("New HQ", response.name());
         assertEquals(null, response.details());
+        assertEquals(true, response.geofenceEnabled());
     }
 
     @Test

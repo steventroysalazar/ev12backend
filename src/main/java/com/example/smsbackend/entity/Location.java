@@ -37,6 +37,9 @@ public class Location {
     @Column(name = "alarm_receiver_users", length = 2000)
     private String alarmReceiverUsersJson;
 
+    @Column(name = "geofence_enabled", nullable = false)
+    private boolean geofenceEnabled;
+
     public Long getId() {
         return id;
     }
@@ -87,5 +90,13 @@ public class Location {
 
     public void setAlarmReceiverUsersJson(String alarmReceiverUsersJson) {
         this.alarmReceiverUsersJson = alarmReceiverUsersJson;
+    }
+
+    public boolean isGeofenceEnabled() {
+        return geofenceEnabled;
+    }
+
+    public void setGeofenceEnabled(boolean geofenceEnabled) {
+        this.geofenceEnabled = geofenceEnabled;
     }
 }

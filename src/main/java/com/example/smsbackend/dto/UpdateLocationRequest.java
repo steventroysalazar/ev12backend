@@ -3,6 +3,7 @@ package com.example.smsbackend.dto;
 public record UpdateLocationRequest(
     String name,
     String details,
-    Long companyId
+    Long companyId,
+    Boolean geofenceEnabled
 ) {
 }

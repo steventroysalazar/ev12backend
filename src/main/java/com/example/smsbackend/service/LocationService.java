@@ -56,6 +56,7 @@ public class LocationService {
         location.setName(request.name().trim());
         location.setDetails(request.details() != null ? request.details().trim() : null);
         location.setCompany(company);
+        location.setGeofenceEnabled(Boolean.TRUE.equals(request.geofenceEnabled()));
 
         Location saved = locationRepository.save(location);
         return toResponse(saved, 0, 0);
@@ -84,6 +85,10 @@ public class LocationService {
 
         if (request.details() != null) {
             location.setDetails(StringUtils.hasText(request.details()) ? request.details().trim() : null);
+        }
+
+        if (request.geofenceEnabled() != null) {
+            location.setGeofenceEnabled(request.geofenceEnabled());
         }
 
         Location saved = locationRepository.save(location);
@@ -136,6 +141,7 @@ public class LocationService {
             location.getName(),
             location.getDetails(),
             location.getCompany().getId(),
+            location.isGeofenceEnabled(),
             toAlarmReceiverConfig(location),
             usersCount,
             devicesCount

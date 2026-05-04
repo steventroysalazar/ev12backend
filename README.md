@@ -825,6 +825,11 @@ Server-Sent Events (SSE) endpoint for real-time alarm updates.
 **Alarm code behavior**
 - `SOS Alert` => active SOS
 - `Fall-Down Alert` => active fall detection
+- `GEO-1 Alert` / `GEO-2 Alert` / `GEO-3 Alert` / `GEO-4 Alert` => active geofence alarm for that slot
+- GEO alarms are enriched using the device's `externalDeviceId` + `protocolConfig.geoFences[slot].mode`:
+  - `mode = "0"` (`Leave Area`) => `outbound` (example: `GEO-1 Alert (outbound)`)
+  - `mode = "1"` (`Enter Area`) => `inbound` (example: `GEO-1 Alert (inbound)`)
+- If geofence mode cannot be resolved from protocol config, backend keeps the original GEO alarm text unchanged.
 - `null` => alarm cleared (for example after `SOS Ending` webhook)
 
 ### Frontend integration pattern (global listener)

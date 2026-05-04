@@ -1523,3 +1523,60 @@ const canSendSms = device.simActivated === true;
 
 If disabled, show helper text:
 > "SIM is not activated. Activate SIM to enable SMS features."
+
+---
+
+## Geofence main toggle + confirmation logging (frontend integration)
+
+### Main geofence setting on device config
+Use the existing top-level field in send-config payload:
+- `geo_fence_enabled`: `true` or `false`
+
+When you save device settings via `POST /api/send-config`, include `geo_fence_enabled` as the **main geofence on/off switch**.
+
+### Log every user popup response when geofence is turned ON
+When frontend shows the confirmation popup (every time user turns geofence from OFF to ON and confirms/cancels), call:
+
+### `POST /api/geofence-toggle-logs`
+Create one audit log row for that popup result.
+
+**Request body**
+```json
+{
+  "device_id": 12,
+  "acted_by_user_id": 7,
+  "enabled": true,
+  "confirmed": true
+}
+```
+
+**Field meaning**
+- `device_id`: target device
+- `acted_by_user_id`: user who clicked popup
+- `enabled`: the new state of main geofence toggle
+- `confirmed`: popup response (`true=continue/confirm`, `false=cancel/deny`)
+
+> Recommendation for frontend: call this endpoint each time user attempts to turn geofence ON and answers popup.
+
+### `GET /api/geofence-toggle-logs?requester_user_id=<id>`
+Read latest 200 geofence toggle logs (newest first).
+
+**Access rule**
+- Only `SUPER_ADMIN` can view logs.
+- For non-super-admin requester, backend returns an error.
+
+**Example response**
+```json
+[
+  {
+    "id": 35,
+    "deviceId": 12,
+    "deviceExternalId": "862667084205114",
+    "actedByUserId": 7,
+    "actedByEmail": "admin@example.com",
+    "enabled": true,
+    "confirmed": true,
+    "createdAt": "2026-05-04T10:15:30.120Z"
+  }
+]
+```
